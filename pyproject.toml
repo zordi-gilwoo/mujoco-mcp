@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mujoco-mcp"
+version = "0.1.0"
+description = "MuJoCo Model Context Protocol server implementation"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "MuJoCo MCP Team"}
+]
+dependencies = [
+    "mujoco>=2.3.0",
+    "fastmcp>=0.1.0",
+    "numpy>=1.22.0",
+    "pydantic>=2.0.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/yourusername/mujoco-mcp"
+"Bug Tracker" = "https://github.com/yourusername/mujoco-mcp/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py" 
