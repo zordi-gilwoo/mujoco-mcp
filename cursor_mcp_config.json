@@ -1,0 +1,41 @@
+{
+  "figma": {
+    "Framelink Figma MCP": {
+      "command": "npx",
+      "args": ["-y", "figma-developer-mcp", "--figma-api-key=figd_kFSGWosDyYRkWKUfZZurv_0zGlEqYvIHZCY3nrFK", "--stdio"]
+    }
+  },
+  "github": {
+    "command": "npx", 
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-github"
+    ],
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+    }
+  },
+  "sequential-thinking": {
+    "command": "npx",
+    "args": [
+      "-y",
+      "@modelcontextprotocol/server-sequential-thinking"
+    ]
+  },
+  "mujoco-mcp": {
+    "command": "python",
+    "args": ["-m", "mujoco_mcp"],
+    "cwd": "/Users/robert/workspace/04-code/03-mujoco/mujoco-mcp",
+    "env": {
+      "PYTHONUNBUFFERED": "1",
+      "PYTHONPATH": "/Users/robert/workspace/04-code/03-mujoco/mujoco-mcp/src",
+      "MUJOCO_MCP_LOG_LEVEL": "INFO"
+    }
+  },
+  "browsermcp": {
+    "command": "npx",
+    "args": [
+      "@browsermcp/mcp@latest"
+    ]
+  }
+}
