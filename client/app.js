@@ -105,30 +105,6 @@ class RemoteViewer {
             generateSceneBtn: document.getElementById('generate-scene-btn'),
             loadSceneBtn: document.getElementById('load-scene-btn'),
             
-            
-            // RL Environment tab system
-            rlTabButtons: document.querySelectorAll('#rl-editor-container .tab-button'),
-            rlTabPanes: document.querySelectorAll('#rl-editor-container .tab-pane'),
-            rlXmlTab: document.getElementById('rl-xml-tab'),
-            rlPythonTab: document.getElementById('rl-python-tab'),
-            rlXmlEditor: document.getElementById('rl-xml-editor'),
-            rlPythonEditor: document.getElementById('rl-python-editor'),
-            
-            // RL Environment editor controls
-            toggleRlEditorBtn: document.getElementById('toggle-rl-editor'),
-            rlEditorContainer: document.getElementById('rl-editor-container'),
-            rlValidationStatus: document.getElementById('rl-validation-status'),
-            
-            // RL Environment controls
-            rlPromptInput: document.getElementById('rl-prompt-input'),
-            rlPresetDropdown: document.getElementById('rl-preset-dropdown'),
-            generateRlEnvBtn: document.getElementById('generate-rl-env-btn'),
-            loadRlEnvBtn: document.getElementById('load-rl-env-btn'),
-            runRandomActionsBtn: document.getElementById('run-random-actions-btn'),
-            stopRlEnvBtn: document.getElementById('stop-rl-env-btn'),
-            toggleGuidelinesBtn: document.getElementById('toggle-guidelines'),
-            guidelinesContainer: document.getElementById('guidelines-container'),
-            
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
             
@@ -181,31 +157,6 @@ class RemoteViewer {
         this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
         this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
         this.elements.toggleSceneXmlBtn.addEventListener('click', () => this.toggleSceneXmlEditor());
-        
-        // RL Environment tab system
-        this.elements.rlTabButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchRLTab(e.target.dataset.tab));
-        });
-        
-        // RL Environment editor controls
-        this.elements.toggleRlEditorBtn.addEventListener('click', () => this.toggleRLEditor());
-        
-        // RL Environment controls
-        this.elements.rlPresetDropdown.addEventListener('change', (e) => {
-            if (e.target.value) {
-                this.handleRLPresetChange(e.target.value);
-            }
-        });
-        
-        this.elements.rlPromptInput.addEventListener('input', () => {
-            this.handleRLPromptChange();
-        });
-        
-        this.elements.generateRlEnvBtn.addEventListener('click', () => this.generateRLEnvironment());
-        this.elements.loadRlEnvBtn.addEventListener('click', () => this.loadRLEnvironment());
-        this.elements.runRandomActionsBtn.addEventListener('click', () => this.runRandomActions());
-        this.elements.stopRlEnvBtn.addEventListener('click', () => this.stopRLEnvironment());
-        this.elements.toggleGuidelinesBtn.addEventListener('click', () => this.toggleGuidelines());
         
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
