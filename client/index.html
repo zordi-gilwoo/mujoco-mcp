@@ -68,26 +68,15 @@
                         </div>
                     </div>
                     
-                    <!-- XML Editor Section -->
+                    <!-- Scene XML Editor Section -->
                     <div class="control-group">
                         <div class="xml-editor-header">
                             <label>Generated Scene XML:</label>
-                            <button id="toggle-xml-editor" class="toggle-btn">Show XML</button>
+                            <button id="toggle-scene-xml-editor" class="toggle-btn">Show XML</button>
                         </div>
-                        <div id="xml-editor-container" class="xml-editor-container collapsed">
-                            <div class="editor-tabs">
-                                <button class="tab-button active" data-tab="xml">XML</button>
-                                <button class="tab-button" data-tab="python">Python RL Env</button>
-                            </div>
-                            <div class="tab-content">
-                                <div id="xml-tab" class="tab-pane active">
-                                    <textarea id="xml-editor" class="xml-editor" readonly placeholder="Scene XML will appear here..."></textarea>
-                                </div>
-                                <div id="python-tab" class="tab-pane">
-                                    <textarea id="python-editor" class="python-editor" placeholder="Python RL environment code will appear here..."></textarea>
-                                </div>
-                            </div>
-                            <div id="xml-validation-status" class="validation-status"></div>
+                        <div id="scene-xml-editor-container" class="xml-editor-container collapsed">
+                            <textarea id="scene-xml-editor" class="xml-editor" placeholder="Scene XML will appear here..."></textarea>
+                            <div id="scene-xml-validation-status" class="validation-status"></div>
                         </div>
                     </div>
                 </div>
@@ -96,7 +85,7 @@
                     <h3>RL Environment Creation</h3>
                     <div class="control-group">
                         <label for="rl-prompt-input">RL Environment Prompt:</label>
-                        <input type="text" id="rl-prompt-input" class="text-input" placeholder="Describe your RL environment...">
+                        <input type="text" id="rl-prompt-input" class="text-input" placeholder="Describe your RL environment using the scene above...">
                         <label for="rl-preset-dropdown">Or choose a preset RL environment:</label>
                         <select id="rl-preset-dropdown" class="dropdown">
                             <option value="">Select an RL environment...</option>
@@ -110,6 +99,29 @@
                             <button id="load-rl-env-btn" disabled>Load RL Env</button>
                             <button id="run-random-actions-btn" disabled>▶ Run Random Actions</button>
                             <button id="stop-rl-env-btn" disabled>⏹ Stop</button>
+                        </div>
+                    </div>
+                    
+                    <!-- RL Environment XML/Python Editor Section -->
+                    <div class="control-group">
+                        <div class="xml-editor-header">
+                            <label>Generated RL Environment:</label>
+                            <button id="toggle-rl-editor" class="toggle-btn">Show RL Code</button>
+                        </div>
+                        <div id="rl-editor-container" class="xml-editor-container collapsed">
+                            <div class="editor-tabs">
+                                <button class="tab-button active" data-tab="rl-xml">RL XML</button>
+                                <button class="tab-button" data-tab="rl-python">Python RL Env</button>
+                            </div>
+                            <div class="tab-content">
+                                <div id="rl-xml-tab" class="tab-pane active">
+                                    <textarea id="rl-xml-editor" class="xml-editor" placeholder="RL environment XML will appear here..."></textarea>
+                                </div>
+                                <div id="rl-python-tab" class="tab-pane">
+                                    <textarea id="rl-python-editor" class="python-editor" placeholder="Python RL environment code will appear here..."></textarea>
+                                </div>
+                            </div>
+                            <div id="rl-validation-status" class="validation-status"></div>
                         </div>
                     </div>
                     
@@ -136,6 +148,7 @@
                                     <li>"Design a cart-pole balancing environment with discrete actions"</li>
                                     <li>"Build a quadruped walking environment with gait rewards"</li>
                                 </ul>
+                                <p><strong>Note:</strong> The RL environment will use the scene created above as its base. Make sure to generate a scene first!</p>
                             </div>
                         </div>
                     </div>
