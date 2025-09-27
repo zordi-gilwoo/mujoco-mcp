@@ -28,6 +28,9 @@
 - **📊 Physics Benchmarking**: Performance, accuracy, and scalability testing
 - **📈 Real-time Monitoring**: Advanced visualization and analytics tools
 - **🚀 Production Ready**: Enhanced server with connection pooling and diagnostics
+- **🔀 Process Pool Architecture**: Isolated processes for true multi-client support
+- **🔌 Automatic Port Allocation**: Dynamic port management prevents conflicts
+- **💾 Session Management**: Complete client isolation and resource cleanup
 
 ## Quick Start
 
@@ -139,8 +142,48 @@ for _ in range(1000):
 | `execute_command` | Natural language | `{"command": "move arm up"}` |
 | `get_loaded_models` | List active models | Returns all loaded models |
 | `close_viewer` | Close GUI window | Closes visualization |
+| `get_session_info` | Session and model info | Returns current session details |
+| `get_process_pool_stats` | Process pool status | Returns process pool statistics |
+| `list_active_processes` | Active processes | Lists all running viewer processes |
+| `terminate_process` | Terminate process | `{"session_id": "session_123"}` |
 
 ## 🚀 Advanced Setup
+
+### Process-Based Multi-Client Architecture
+MuJoCo MCP uses a process-based architecture where each client gets a dedicated viewer process:
+
+```python
+# Each client gets dedicated viewer process with complete isolation
+from mujoco_mcp.session_manager import SessionManager
+
+session_manager = SessionManager()
+# - Dedicated viewer process (PID isolation)
+# - Automatic port allocation (8001-9000)
+# - Independent memory space  
+# - Complete crash isolation
+# - Automatic cleanup on disconnect
+```
+
+**Key Benefits:**
+- 🔒 **Complete Isolation**: Memory and process separation between clients
+- 🔌 **Auto Port Management**: Dynamic port allocation and conflict prevention
+- 📊 **Health Monitoring**: Background process monitoring and auto-restart
+- 🧹 **Automatic Cleanup**: Resources freed on client disconnect
+- 🚀 **Enterprise Scale**: Support for hundreds of concurrent clients
+- 🛡️ **Crash Protection**: One client failure doesn't affect others
+
+**Process Management MCP Tools:**
+- `get_process_pool_stats` - Process pool statistics and health
+- `list_active_processes` - Show all running viewer processes  
+- `terminate_process` - Manually terminate specific processes
+
+**Demo Application:**
+```bash
+# Run the multi-client process-based demo
+python demo_multi_client_process_based.py
+```
+
+See [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for technical details.
 
 ### Install MuJoCo Menagerie (for robot models)
 ```bash
