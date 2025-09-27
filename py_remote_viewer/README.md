@@ -12,6 +12,7 @@ This is a fully Python-based, headless, browser-accessible MuJoCo viewer that pr
 - **Interactive Controls**: Mouse, keyboard, and touch input handling
 - **Camera Management**: Orbit/pan/zoom camera controls with presets
 - **Simulation Interface**: Start/pause/reset simulation controls
+- **Scene Creation**: Text prompt-based scene generation with XML editor
 - **Event Protocol**: JSON-based event system for all interactions
 - **MuJoCo Physics**: Real physics simulation with graceful error handling
 - **Web Interface**: Modern, responsive HTML/CSS/JS client
@@ -28,6 +29,13 @@ The remote viewer now includes full MuJoCo physics simulation:
 - **Custom Models**: Load any MuJoCo XML model via API
 - **Physics Stepping**: Real-time simulation at 60 FPS
 - **State Management**: Full access to joint positions, velocities, forces
+
+### Scene Creation Interface
+- **Text Prompts**: Enter natural language descriptions to generate scenes
+- **Preset Scenes**: Quick access to common simulation types (pendulum, cart-pole, etc.)
+- **XML Editor**: View and edit generated MuJoCo XML with syntax highlighting
+- **Live Loading**: Dynamically load new scenes into running simulation
+- **Validation**: Real-time XML validation and error reporting
 
 ### Rendering Pipeline
 - **Headless Support**: Works in server environments without displays
@@ -314,6 +322,33 @@ Access metrics via:
 - Server logs
 - `/api/stats` endpoint
 - Web interface statistics panel
+
+## 🌐 **API Reference**
+
+The server provides several REST API endpoints:
+
+### Configuration & Status
+- **`GET /api/config`** - Get current server configuration
+- **`GET /api/stats`** - Get server statistics and simulation state
+- **`GET /api/health`** - Health check endpoint
+
+### Scene Management
+- **`POST /api/scene/load`** - Load a new scene from MuJoCo XML
+  ```json
+  {
+    "xml": "<mujoco>...</mujoco>"
+  }
+  ```
+  Response:
+  ```json
+  {
+    "success": true,
+    "message": "Scene loaded successfully"
+  }
+  ```
+
+### WebSocket Endpoints
+- **`WS /ws/signaling`** - WebRTC signaling and event handling
 
 ## 🐛 Troubleshooting
 

@@ -259,11 +259,14 @@ class SignalingServer:
         
         # Try to load the scene in the simulation
         try:
-            if hasattr(self.simulation, 'load_from_xml_string'):
-                self.simulation.load_from_xml_string(scene_xml)
-                logger.info("Scene loaded into simulation")
+            if hasattr(self.simulation, 'load_model'):
+                success = self.simulation.load_model(scene_xml)
+                if success:
+                    logger.info("Scene loaded into simulation successfully")
+                else:
+                    logger.warning("Scene loading returned False - may have failed")
             else:
-                logger.warning("Simulation does not support XML loading")
+                logger.warning("Simulation does not support model loading")
         except Exception as e:
             logger.error(f"Failed to load scene into simulation: {e}")
         
