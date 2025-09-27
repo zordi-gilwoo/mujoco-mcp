@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuJoCo Remote Viewer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>MuJoCo Remote Viewer</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status-disconnected">Disconnected</span>
+                <span id="frame-counter">Frames: 0</span>
+                <span id="event-counter">Events: 0</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="video-panel">
+                <div class="video-container">
+                    <video id="remote-video" autoplay muted playsinline></video>
+                    <div id="video-overlay" class="video-overlay">
+                        <div class="loading-spinner" id="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>Connecting to remote viewer...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="video-controls">
+                    <button id="connect-btn">Connect</button>
+                    <button id="disconnect-btn" disabled>Disconnect</button>
+                    <button id="fullscreen-btn">Fullscreen</button>
+                </div>
+            </div>
+
+            <div class="control-panel">
+                <div class="panel-section">
+                    <h3>Camera Controls</h3>
+                    <div class="control-group">
+                        <label>Preset Views:</label>
+                        <div class="button-group">
+                            <button class="preset-btn" data-preset="front">Front</button>
+                            <button class="preset-btn" data-preset="side">Side</button>
+                            <button class="preset-btn" data-preset="top">Top</button>
+                            <button class="preset-btn" data-preset="reset">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Simulation Controls</h3>
+                    <div class="control-group">
+                        <div class="button-group">
+                            <button id="start-sim-btn">Start</button>
+                            <button id="pause-sim-btn">Pause</button>
+                            <button id="reset-sim-btn">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Event Log</h3>
+                    <div id="event-log" class="event-log">
+                        <p>No events logged yet...</p>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Statistics</h3>
+                    <div id="stats-display" class="stats-display">
+                        <div class="stat-item">
+                            <span class="stat-label">Connected:</span>
+                            <span class="stat-value" id="stat-connected">No</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Frames Received:</span>
+                            <span class="stat-value" id="stat-frames">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Events Sent:</span>
+                            <span class="stat-value" id="stat-events">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="help-text">
+                <p><strong>Controls:</strong> Left-click + drag to rotate camera, Right-click + drag to pan, Scroll to zoom</p>
+                <p><strong>Keyboard:</strong> Arrow keys to rotate, Page Up/Down to zoom, Space to pause/resume</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
