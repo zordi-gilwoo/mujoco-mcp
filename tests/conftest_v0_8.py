@@ -1,6 +1,6 @@
 """
 Simplified conftest.py for v0.8 tests
-避免复杂的依赖导入，专注于基础测试
+Avoid complex dependency imports, focus on basic testing
 """
 
 import pytest
@@ -8,15 +8,15 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def simple_setup():
-    """简化的测试设置，不导入复杂模块"""
-    # 不做任何复杂导入，只是确保测试环境清洁
+    """Simplified test setup, avoid importing complex modules"""
+    # Don't do any complex imports, just ensure test environment is clean
     return
-    # 测试后清理
+    # Test cleanup
 
 
 @pytest.fixture
 def mock_viewer():
-    """模拟viewer，避免GUI依赖"""
+    """Mock viewer, avoid GUI dependencies"""
 
     class MockViewer:
         def close(self):
