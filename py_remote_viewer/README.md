@@ -4,7 +4,7 @@ A fully Python-based, headless, browser-accessible MuJoCo viewer scaffold that e
 
 ## 🎯 Overview
 
-This is an alternative implementation to the existing C++ WebRTC effort, designed to evaluate which path (C++ vs Python) best fits performance and maintenance goals. The scaffold is intentionally isolated and provides a complete WebRTC-based remote viewing solution with synthetic frame generation for development and testing.
+This is a fully Python-based, headless, browser-accessible MuJoCo viewer that provides a complete WebRTC-based remote viewing solution. The system enables running simulations on headless servers with real-time browser interaction, combining synthetic frame generation for development with full MuJoCo physics simulation capabilities.
 
 ## ✨ Features
 
@@ -306,27 +306,6 @@ USE_SYNTHETIC_FRAMES=1 ./scripts/run_py_viewer.sh
 2. Kubernetes deployment configs
 3. Load balancing and scaling
 4. Monitoring and alerting
-
-## 🆚 Python vs C++ Comparison
-
-### Python Advantages
-- **Rapid Development**: Fast prototyping and iteration
-- **Rich Ecosystem**: Extensive libraries (FastAPI, aiortc, etc.)
-- **Maintainability**: Easier to read, debug, and modify
-- **Integration**: Native MuJoCo Python bindings
-- **Flexibility**: Dynamic configuration and hot-reloading
-
-### C++ Advantages
-- **Performance**: Lower latency and higher throughput potential
-- **Memory Efficiency**: Better control over memory allocation
-- **Native Integration**: Direct MuJoCo C API access
-- **Hardware Acceleration**: Easier GPU/hardware optimization
-
-### Recommendation Criteria
-- **Latency Requirements**: <16ms → Consider C++, <50ms → Python OK
-- **Concurrent Users**: <10 → Python OK, >50 → Consider C++
-- **Development Speed**: Fast iteration → Python, Stable requirements → C++
-- **Team Expertise**: Web/Python → Python, Systems/C++ → C++
 
 ## 📊 Performance Metrics
 
