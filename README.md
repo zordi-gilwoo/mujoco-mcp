@@ -28,6 +28,9 @@
 - **📊 Physics Benchmarking**: Performance, accuracy, and scalability testing
 - **📈 Real-time Monitoring**: Advanced visualization and analytics tools
 - **🚀 Production Ready**: Enhanced server with connection pooling and diagnostics
+- **🔀 Process Pool Architecture**: Isolated processes for true multi-client support
+- **🔌 Automatic Port Allocation**: Dynamic port management prevents conflicts
+- **💾 Session Management**: Complete client isolation and resource cleanup
 
 ## Quick Start
 
@@ -139,8 +142,43 @@ for _ in range(1000):
 | `execute_command` | Natural language | `{"command": "move arm up"}` |
 | `get_loaded_models` | List active models | Returns all loaded models |
 | `close_viewer` | Close GUI window | Closes visualization |
+| `get_session_info` | Session and model info | Returns current session details |
+| `get_process_pool_stats` | Process pool status | Returns process pool statistics |
+| `list_active_processes` | Active processes | Lists all running viewer processes |
+| `terminate_process` | Terminate process | `{"session_id": "session_123"}` |
 
 ## 🚀 Advanced Setup
+
+### Multi-Client Process Pool Architecture
+The new process pool architecture enables truly isolated multi-client support:
+
+```python
+# Automatic process isolation - each client gets its own process
+from mujoco_mcp.session_manager import SessionManager
+
+# Enable isolated processes (default in v0.8.2+)
+session_manager = SessionManager(use_isolated_processes=True)
+
+# Each client automatically gets:
+# - Dedicated viewer process (PID isolation)
+# - Unique port allocation (8001-9000)
+# - Independent simulation state
+# - Automatic cleanup on disconnect
+```
+
+**Key Benefits:**
+- 🔒 **Complete Isolation**: Memory and process separation
+- 🔌 **Auto Port Management**: No manual configuration needed
+- 📊 **Health Monitoring**: Background process monitoring
+- 🧹 **Automatic Cleanup**: Resources freed on client disconnect
+- 🚀 **Scalable**: Support for hundreds of concurrent clients
+
+**New MCP Tools for Process Management:**
+- `get_process_pool_stats` - Process pool statistics and health
+- `list_active_processes` - Show all running viewer processes  
+- `terminate_process` - Manually terminate specific processes
+
+See [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for detailed documentation.
 
 ### Install MuJoCo Menagerie (for robot models)
 ```bash

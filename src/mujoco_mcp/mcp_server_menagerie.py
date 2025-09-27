@@ -19,6 +19,7 @@ from .version import __version__
 from .viewer_client import MuJoCoViewerClient as ViewerClient
 from .menagerie_loader import MenagerieLoader
 from .session_manager import session_manager
+from .process_manager import process_manager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -176,6 +177,38 @@ async def handle_list_tools() -> List[types.Tool]:
                 "type": "object",
                 "properties": {},
                 "required": []
+            }
+        ),
+        types.Tool(
+            name="get_process_pool_stats",
+            description="Get statistics about the process pool and active processes",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        types.Tool(
+            name="list_active_processes",
+            description="List all active viewer processes with details",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        ),
+        types.Tool(
+            name="terminate_process",
+            description="Terminate a specific viewer process by session ID",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {
+                        "type": "string",
+                        "description": "Session ID of the process to terminate"
+                    }
+                },
+                "required": ["session_id"]
             }
         ),
         types.Tool(
@@ -784,6 +817,81 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     "all_sessions": session_stats
                 }, indent=2)
             )]
+        
+        elif name == "get_process_pool_stats":
+            # Get process pool statistics
+            session_stats = session_manager.get_session_stats()
+            process_stats = process_manager.get_stats()
+            
+            stats_info = {
+                "process_pool": process_stats,
+                "session_summary": {
+                    "active_sessions": session_stats.get("active_sessions", 0),
+                    "isolated_process_mode": session_stats.get("isolated_process_mode", False)
+                },
+                "resource_usage": {
+                    "total_processes": process_stats.get("total_processes", 0),
+                    "running_processes": process_stats.get("running_processes", 0),
+                    "used_ports": process_stats.get("used_ports", 0),
+                    "available_ports": process_stats.get("available_ports", 0)
+                }
+            }
+            
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(stats_info, indent=2)
+            )]
+        
+        elif name == "list_active_processes":
+            # List all active processes
+            processes = process_manager.list_processes()
+            
+            if not processes:
+                return [types.TextContent(
+                    type="text",
+                    text="📊 No active processes found"
+                )]
+            
+            process_list = {
+                "active_processes": len(processes),
+                "processes": processes
+            }
+            
+            return [types.TextContent(
+                type="text",
+                text=json.dumps(process_list, indent=2)
+            )]
+        
+        elif name == "terminate_process":
+            session_id = arguments.get("session_id")
+            
+            if not session_id:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ Session ID is required"
+                )]
+            
+            # Check if process exists
+            process_info = process_manager.get_process_info(session_id)
+            if not process_info:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ No process found for session {session_id}"
+                )]
+            
+            # Terminate the process
+            success = process_manager.terminate_process(session_id)
+            
+            if success:
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ Process for session {session_id} terminated successfully"
+                )]
+            else:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to terminate process for session {session_id}"
+                )]
         
         elif name == "execute_command":
             command = arguments.get("command", "").strip()

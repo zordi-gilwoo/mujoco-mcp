@@ -12,7 +12,7 @@ from typing import Dict, Optional, Any
 from dataclasses import dataclass
 
 from .viewer_client import MuJoCoViewerClient, ViewerManager, viewer_manager
-from .process_manager import test_process_manager as process_manager
+from .process_manager import process_manager
 
 logger = logging.getLogger("mujoco_mcp.session_manager")
 
@@ -246,5 +246,5 @@ class SessionManager:
         return self._base_port + self._port_counter
 
 
-# Global session manager instance
-session_manager = SessionManager()
+# Global session manager instance with isolated processes enabled
+session_manager = SessionManager(use_isolated_processes=True)
