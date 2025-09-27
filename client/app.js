@@ -78,40 +78,32 @@ class RemoteViewer {
             pauseSimBtn: document.getElementById('pause-sim-btn'),
             resetSimBtn: document.getElementById('reset-sim-btn'),
             
+            // Free-style command interface (main input)
+            freestyleCommandInput: document.getElementById('freestyle-command-input'),
+            executeCommandBtn: document.getElementById('execute-command-btn'),
+            suggestionBtns: document.querySelectorAll('.suggestion-btn'),
+            commandResult: document.getElementById('command-result'),
+            
+            // XML Editor
+            toggleXmlBtn: document.getElementById('toggle-xml-editor'),
+            xmlEditorContainer: document.getElementById('xml-editor-container'),
+            xmlEditor: document.getElementById('xml-editor'),
+            xmlValidationStatus: document.getElementById('xml-validation-status'),
+            saveXmlBtn: document.getElementById('save-xml-btn'),
+            validateXmlBtn: document.getElementById('validate-xml-btn'),
+            
+            // RL Editor
+            toggleRlBtn: document.getElementById('toggle-rl-editor'),
+            rlEditorContainer: document.getElementById('rl-editor-container'),
+            rlEditor: document.getElementById('rl-editor'),
+            rlValidationStatus: document.getElementById('rl-validation-status'),
+            saveRlBtn: document.getElementById('save-rl-btn'),
+            runRlBtn: document.getElementById('run-rl-btn'),
             // Scene creation controls
             scenePromptInput: document.getElementById('scene-prompt-input'),
             scenePresetDropdown: document.getElementById('scene-preset-dropdown'),
             generateSceneBtn: document.getElementById('generate-scene-btn'),
             loadSceneBtn: document.getElementById('load-scene-btn'),
-            
-            // Scene XML editor
-            toggleSceneXmlBtn: document.getElementById('toggle-scene-xml-editor'),
-            sceneXmlEditorContainer: document.getElementById('scene-xml-editor-container'),
-            sceneXmlEditor: document.getElementById('scene-xml-editor'),
-            sceneXmlValidationStatus: document.getElementById('scene-xml-validation-status'),
-            
-            // RL Environment tab system
-            rlTabButtons: document.querySelectorAll('#rl-editor-container .tab-button'),
-            rlTabPanes: document.querySelectorAll('#rl-editor-container .tab-pane'),
-            rlXmlTab: document.getElementById('rl-xml-tab'),
-            rlPythonTab: document.getElementById('rl-python-tab'),
-            rlXmlEditor: document.getElementById('rl-xml-editor'),
-            rlPythonEditor: document.getElementById('rl-python-editor'),
-            
-            // RL Environment editor controls
-            toggleRlEditorBtn: document.getElementById('toggle-rl-editor'),
-            rlEditorContainer: document.getElementById('rl-editor-container'),
-            rlValidationStatus: document.getElementById('rl-validation-status'),
-            
-            // RL Environment controls
-            rlPromptInput: document.getElementById('rl-prompt-input'),
-            rlPresetDropdown: document.getElementById('rl-preset-dropdown'),
-            generateRlEnvBtn: document.getElementById('generate-rl-env-btn'),
-            loadRlEnvBtn: document.getElementById('load-rl-env-btn'),
-            runRandomActionsBtn: document.getElementById('run-random-actions-btn'),
-            stopRlEnvBtn: document.getElementById('stop-rl-env-btn'),
-            toggleGuidelinesBtn: document.getElementById('toggle-guidelines'),
-            guidelinesContainer: document.getElementById('guidelines-container'),
             
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
@@ -138,6 +130,18 @@ class RemoteViewer {
         this.elements.pauseSimBtn.addEventListener('click', () => this.sendCommand('pause'));
         this.elements.resetSimBtn.addEventListener('click', () => this.sendCommand('reset'));
         
+
+        // Editor controls
+        this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
+        this.elements.toggleRlBtn.addEventListener('click', () => this.toggleRlEditor());
+        this.elements.saveXmlBtn.addEventListener('click', () => this.saveXmlContent());
+        this.elements.validateXmlBtn.addEventListener('click', () => this.validateXmlContent());
+        this.elements.saveRlBtn.addEventListener('click', () => this.saveRlContent());
+        this.elements.runRlBtn.addEventListener('click', () => this.runRlScript());
+        
+        // Editor content change listeners
+        this.elements.xmlEditor.addEventListener('input', () => this.handleXmlEditorChange());
+        this.elements.rlEditor.addEventListener('input', () => this.handleRlEditorChange())
         // Scene creation controls
         this.elements.scenePresetDropdown.addEventListener('change', (e) => {
             if (e.target.value) {
@@ -154,31 +158,6 @@ class RemoteViewer {
         this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
         this.elements.toggleSceneXmlBtn.addEventListener('click', () => this.toggleSceneXmlEditor());
         
-        // RL Environment tab system
-        this.elements.rlTabButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchRLTab(e.target.dataset.tab));
-        });
-        
-        // RL Environment editor controls
-        this.elements.toggleRlEditorBtn.addEventListener('click', () => this.toggleRLEditor());
-        
-        // RL Environment controls
-        this.elements.rlPresetDropdown.addEventListener('change', (e) => {
-            if (e.target.value) {
-                this.handleRLPresetChange(e.target.value);
-            }
-        });
-        
-        this.elements.rlPromptInput.addEventListener('input', () => {
-            this.handleRLPromptChange();
-        });
-        
-        this.elements.generateRlEnvBtn.addEventListener('click', () => this.generateRLEnvironment());
-        this.elements.loadRlEnvBtn.addEventListener('click', () => this.loadRLEnvironment());
-        this.elements.runRandomActionsBtn.addEventListener('click', () => this.runRandomActions());
-        this.elements.stopRlEnvBtn.addEventListener('click', () => this.stopRLEnvironment());
-        this.elements.toggleGuidelinesBtn.addEventListener('click', () => this.toggleGuidelines());
-        
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -188,6 +167,29 @@ class RemoteViewer {
                 } else {
                     this.sendCommand('set_camera_preset', { preset });
                 }
+            });
+        });
+        
+        // Free-style command interface
+        this.elements.executeCommandBtn.addEventListener('click', () => this.executeFreestyleCommand());
+        
+        this.elements.freestyleCommandInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                this.executeFreestyleCommand();
+            }
+        });
+        
+        this.elements.freestyleCommandInput.addEventListener('input', () => {
+            this.handleFreestyleInputChange();
+        });
+        
+        this.elements.suggestionBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const command = e.target.dataset.command;
+                this.elements.freestyleCommandInput.value = command;
+                this.handleFreestyleInputChange();
+                this.executeFreestyleCommand();
             });
         });
         
@@ -685,6 +687,9 @@ class RemoteViewer {
         
         // Video overlay
         this.elements.videoOverlay.classList.toggle('hidden', this.isConnected);
+        
+        // Free-style command interface (always enabled - works independently of viewer connection)
+        this.handleFreestyleInputChange();
         
         // Counters
         this.elements.frameCounter.textContent = `Frames: ${this.frameCount}`;
@@ -1465,6 +1470,284 @@ if __name__ == "__main__":
         const statusElement = this.elements.xmlValidationStatus;
         statusElement.className = `validation-status ${status}`;
         statusElement.textContent = message;
+    }
+    
+    /**
+     * Handle free-style command input changes
+     */
+    handleFreestyleInputChange() {
+        const command = this.elements.freestyleCommandInput.value.trim();
+        this.elements.executeCommandBtn.disabled = !command;
+    }
+    
+    /**
+     * Execute free-style natural language command
+     */
+    async executeFreestyleCommand() {
+        const command = this.elements.freestyleCommandInput.value.trim();
+        if (!command) return;
+        
+        this.elements.executeCommandBtn.disabled = true;
+        this.elements.executeCommandBtn.classList.add('executing');
+        this.elements.executeCommandBtn.textContent = 'Executing...';
+        
+        this.showCommandResult('loading', 'Executing command...');
+        this.logEvent('Command', `Executing: "${command}"`);
+        
+        try {
+            // Send command to MCP server
+            const response = await fetch('/api/execute-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    command: command
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.showCommandResult('success', result.result || result.message);
+                this.logEvent('Command', 'Command executed successfully');
+                
+                // Check if scene was updated and refresh if connected
+                if (this.isConnected && (result.actions_taken?.includes('created_scene') || 
+                    result.actions_taken?.includes('created_menagerie_scene'))) {
+                    this.sendEvent({
+                        type: 'refresh_scene'
+                    });
+                }
+            } else {
+                throw new Error(result.error || result.message || 'Command execution failed');
+            }
+            
+        } catch (error) {
+            this.showCommandResult('error', `Error: ${error.message}`);
+            this.logEvent('Error', `Command failed: ${error.message}`);
+        } finally {
+            this.elements.executeCommandBtn.disabled = false;
+            this.elements.executeCommandBtn.classList.remove('executing');
+            this.elements.executeCommandBtn.textContent = 'Execute Command';
+            this.handleFreestyleInputChange(); // Re-enable based on input content
+        }
+    }
+    
+    /**
+     * Show command execution result
+     */
+    showCommandResult(type, message) {
+        const resultElement = this.elements.commandResult;
+        resultElement.className = `command-result ${type}`;
+        resultElement.textContent = message;
+        resultElement.style.display = 'block';
+        
+        // Auto-hide after success (but keep errors/loading visible)
+        if (type === 'success') {
+            setTimeout(() => {
+                if (resultElement.classList.contains('success')) {
+                    resultElement.style.display = 'none';
+                }
+            }, 5000);
+        }
+    }
+    
+    /**
+     * Toggle RL editor visibility
+     */
+    toggleRlEditor() {
+        const container = this.elements.rlEditorContainer;
+        const btn = this.elements.toggleRlBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide RL Editor';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show RL Editor';
+        }
+    }
+    
+    /**
+     * Handle XML editor content changes
+     */
+    handleXmlEditorChange() {
+        const hasContent = this.elements.xmlEditor.value.trim().length > 0;
+        this.elements.saveXmlBtn.disabled = !hasContent;
+        
+        // Clear validation status when content changes
+        this.setEditorValidationStatus('xml', '', '');
+    }
+    
+    /**
+     * Handle RL editor content changes
+     */
+    handleRlEditorChange() {
+        const hasContent = this.elements.rlEditor.value.trim().length > 0;
+        this.elements.saveRlBtn.disabled = !hasContent;
+        this.elements.runRlBtn.disabled = !hasContent;
+        
+        // Clear validation status when content changes
+        this.setEditorValidationStatus('rl', '', '');
+    }
+    
+    /**
+     * Save XML content
+     */
+    async saveXmlContent() {
+        const xml = this.elements.xmlEditor.value.trim();
+        if (!xml) return;
+        
+        this.elements.saveXmlBtn.disabled = true;
+        this.elements.saveXmlBtn.textContent = 'Saving...';
+        
+        try {
+            // Validate first
+            const isValid = await this.validateXmlContent();
+            if (!isValid) {
+                throw new Error('XML validation failed');
+            }
+            
+            // Here you could send the XML to the server or save locally
+            this.currentSceneXML = xml;
+            this.setEditorValidationStatus('xml', 'valid', 'XML saved successfully');
+            this.logEvent('XML', 'Scene XML saved successfully');
+            
+        } catch (error) {
+            this.setEditorValidationStatus('xml', 'invalid', `Save failed: ${error.message}`);
+            this.logEvent('Error', `XML save failed: ${error.message}`);
+        } finally {
+            this.elements.saveXmlBtn.disabled = false;
+            this.elements.saveXmlBtn.textContent = 'Save XML';
+        }
+    }
+    
+    /**
+     * Validate XML content
+     */
+    async validateXmlContent() {
+        const xml = this.elements.xmlEditor.value.trim();
+        if (!xml) {
+            this.setEditorValidationStatus('xml', 'invalid', 'No XML content to validate');
+            return false;
+        }
+        
+        this.setEditorValidationStatus('xml', 'checking', 'Validating XML...');
+        
+        try {
+            // Basic XML structure validation
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            
+            // Check for parsing errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                throw new Error('Invalid XML structure');
+            }
+            
+            // Check if it's a MuJoCo XML (has mujoco root element)
+            const mujocoRoot = doc.querySelector('mujoco');
+            if (!mujocoRoot) {
+                throw new Error('Not a valid MuJoCo XML (missing <mujoco> root element)');
+            }
+            
+            // Check for required worldbody
+            const worldbody = doc.querySelector('worldbody');
+            if (!worldbody) {
+                throw new Error('Missing <worldbody> element');
+            }
+            
+            this.setEditorValidationStatus('xml', 'valid', 'Valid MuJoCo XML');
+            return true;
+            
+        } catch (error) {
+            this.setEditorValidationStatus('xml', 'invalid', `Validation error: ${error.message}`);
+            return false;
+        }
+    }
+    
+    /**
+     * Save RL script content
+     */
+    async saveRlContent() {
+        const script = this.elements.rlEditor.value.trim();
+        if (!script) return;
+        
+        this.elements.saveRlBtn.disabled = true;
+        this.elements.saveRlBtn.textContent = 'Saving...';
+        
+        try {
+            // Here you could send the script to the server or save locally
+            this.currentRlScript = script;
+            this.setEditorValidationStatus('rl', 'valid', 'RL script saved successfully');
+            this.logEvent('RL', 'RL script saved successfully');
+            
+        } catch (error) {
+            this.setEditorValidationStatus('rl', 'invalid', `Save failed: ${error.message}`);
+            this.logEvent('Error', `RL script save failed: ${error.message}`);
+        } finally {
+            this.elements.saveRlBtn.disabled = false;
+            this.elements.saveRlBtn.textContent = 'Save Script';
+        }
+    }
+    
+    /**
+     * Run RL script
+     */
+    async runRlScript() {
+        const script = this.elements.rlEditor.value.trim();
+        if (!script) return;
+        
+        this.elements.runRlBtn.disabled = true;
+        this.elements.runRlBtn.textContent = 'Running...';
+        
+        try {
+            // Send RL script execution command via the freestyle command interface
+            const response = await fetch('/api/execute-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    command: `Execute RL script: ${script}`
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.setEditorValidationStatus('rl', 'valid', 'RL script executed successfully');
+                this.logEvent('RL', 'RL script executed successfully');
+            } else {
+                throw new Error(result.error || 'RL script execution failed');
+            }
+            
+        } catch (error) {
+            this.setEditorValidationStatus('rl', 'invalid', `Execution failed: ${error.message}`);
+            this.logEvent('Error', `RL script execution failed: ${error.message}`);
+        } finally {
+            this.elements.runRlBtn.disabled = false;
+            this.elements.runRlBtn.textContent = 'Run Script';
+        }
+    }
+    
+    /**
+     * Set validation status for editors (separate from the legacy method)
+     */
+    setEditorValidationStatus(editorType, status, message) {
+        let statusElement;
+        
+        if (editorType === 'xml') {
+            statusElement = this.elements.xmlValidationStatus;
+        } else if (editorType === 'rl') {
+            statusElement = this.elements.rlValidationStatus;
+        }
+        
+        if (statusElement) {
+            statusElement.className = `validation-status ${status}`;
+            statusElement.textContent = message;
+        }
     }
 }
 
