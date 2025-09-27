@@ -7,5 +7,6 @@ __author__ = "MuJoCo MCP Team"
 from .camera_state import CameraState
 from .events import EventProtocol, EventType
 from .simulation_stub import SimulationStub
+from .mujoco_simulation import MuJoCoSimulation
 
-__all__ = ["CameraState", "EventProtocol", "EventType", "SimulationStub"]
+__all__ = ["CameraState", "EventProtocol", "EventType", "SimulationStub", "MuJoCoSimulation"]

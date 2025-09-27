@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Configuration: {app.state.config.to_dict()}")
     
     # Start simulation if configured to auto-start
-    app.state.signaling_server.simulation_stub.start()
+    app.state.signaling_server.simulation.start()
     
     yield
     
@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     logger.info("Shutting down MuJoCo Remote Viewer server")
     
     # Stop simulation
-    app.state.signaling_server.simulation_stub.stop()
+    app.state.signaling_server.simulation.stop()
     
     # Cleanup peer connections
     for client_id in list(app.state.signaling_server.peer_connections.keys()):

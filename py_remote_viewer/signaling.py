@@ -9,9 +9,9 @@ from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
 
 from .config import ViewerConfig
-from .webrtc_track import SyntheticVideoTrack
+from .webrtc_track import SyntheticVideoTrack, MuJoCoVideoTrack
 from .events import EventProtocol
-from .simulation_stub import SimulationStub
+from .mujoco_simulation import MuJoCoSimulation
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,15 @@ class SignalingServer:
     
     def __init__(self, config: ViewerConfig):
         self.config = config
-        self.simulation_stub = SimulationStub()
+        
+        # Use real MuJoCo simulation or fallback to synthetic frames
+        if config.use_synthetic_frames:
+            print("[SignalingServer] Using synthetic frames for development")
+            from .simulation_stub import SimulationStub
+            self.simulation = SimulationStub()
+        else:
+            print("[SignalingServer] Using real MuJoCo simulation")
+            self.simulation = MuJoCoSimulation()
         
         # Connection management
         self.peer_connections: Dict[str, RTCPeerConnection] = {}
@@ -129,9 +137,8 @@ class SignalingServer:
         if self.config.use_synthetic_frames:
             video_track = SyntheticVideoTrack(self.config)
         else:
-            # Future: MuJoCoVideoTrack(self.config, self.simulation_stub)
-            logger.warning("Real MuJoCo rendering not yet implemented, using synthetic frames")
-            video_track = SyntheticVideoTrack(self.config)
+            # Use real MuJoCo rendering
+            video_track = MuJoCoVideoTrack(self.config, self.simulation)
         
         pc.addTrack(video_track)
         
@@ -180,7 +187,7 @@ class SignalingServer:
             event = EventProtocol.parse_event(event_data)
             if event:
                 # Forward to simulation
-                handled = self.simulation_stub.handle_event(event)
+                handled = self.simulation.handle_event(event)
                 logger.info(f"Event from {client_id}: {event.type.value} (handled: {handled})")
                 self.stats["events_received"] += 1
             else:
@@ -238,5 +245,5 @@ class SignalingServer:
         """
         return {
             **self.stats,
-            "simulation_state": self.simulation_stub.get_state(),
+            "simulation_state": self.simulation.get_state(),
         }

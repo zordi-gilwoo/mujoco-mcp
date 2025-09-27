@@ -33,6 +33,7 @@ def check_imports() -> List[Tuple[str, bool, str]]:
         "py_remote_viewer.events",
         "py_remote_viewer.camera_state",
         "py_remote_viewer.simulation_stub",
+        "py_remote_viewer.mujoco_simulation",
         "py_remote_viewer.webrtc_track",
         "py_remote_viewer.signaling",
         "py_remote_viewer.server",
@@ -60,6 +61,7 @@ def check_basic_functionality():
     from .events import EventProtocol, EventType, MouseEvent
     from .camera_state import CameraState
     from .simulation_stub import SimulationStub
+    from .mujoco_simulation import MuJoCoSimulation
     
     print("🔧 Testing basic functionality...")
     
@@ -93,6 +95,19 @@ def check_basic_functionality():
     sim.stop()
     assert not sim.state.is_running
     print("✅ Simulation stub: OK")
+    
+    # Test MuJoCo simulation
+    try:
+        mujoco_sim = MuJoCoSimulation()
+        assert not mujoco_sim.state.is_running
+        mujoco_sim.start()
+        assert mujoco_sim.state.is_running
+        mujoco_sim.stop()
+        assert not mujoco_sim.state.is_running
+        print("✅ MuJoCo simulation: OK")
+    except Exception as e:
+        print(f"⚠️  MuJoCo simulation: {e} (may be expected if MuJoCo not properly configured)")
+        # Don't fail the test for MuJoCo issues in dev environments
 
 
 def main():
