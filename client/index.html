@@ -51,6 +51,37 @@
                 </div>
 
                 <div class="panel-section">
+                    <h3>Scene Creation</h3>
+                    <div class="control-group">
+                        <label for="scene-prompt-input">Scene Prompt:</label>
+                        <input type="text" id="scene-prompt-input" class="text-input" placeholder="Enter a scene description...">
+                        <label for="scene-preset-dropdown">Or choose a preset:</label>
+                        <select id="scene-preset-dropdown" class="dropdown">
+                            <option value="">Select a preset scene...</option>
+                            <option value="Create a pendulum simulation">Simple Pendulum</option>
+                            <option value="Create a double pendulum">Double Pendulum (Chaotic)</option>
+                            <option value="Create a cart pole simulation">Cart-Pole Balancing</option>
+                        </select>
+                        <div class="button-group">
+                            <button id="generate-scene-btn">Generate Scene</button>
+                            <button id="load-scene-btn" disabled>Load Scene</button>
+                        </div>
+                    </div>
+                    
+                    <!-- XML Editor Section -->
+                    <div class="control-group">
+                        <div class="xml-editor-header">
+                            <label>Generated Scene XML:</label>
+                            <button id="toggle-xml-editor" class="toggle-btn">Show XML</button>
+                        </div>
+                        <div id="xml-editor-container" class="xml-editor-container collapsed">
+                            <textarea id="xml-editor" class="xml-editor" readonly placeholder="Scene XML will appear here..."></textarea>
+                            <div id="xml-validation-status" class="validation-status"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
                     <h3>Simulation Controls</h3>
                     <div class="control-group">
                         <div class="button-group">

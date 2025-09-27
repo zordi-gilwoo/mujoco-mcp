@@ -46,6 +46,9 @@ class SignalingServer:
             "events_received": 0,
         }
         
+        # Scene management
+        self.current_scene_xml = None
+        
         # Metrics reporter will be started when needed
         self._metrics_task = None
     
@@ -245,3 +248,39 @@ class SignalingServer:
             **self.stats,
             "simulation_state": self.simulation.get_state(),
         }
+    
+    async def broadcast_scene_update(self, scene_xml: str):
+        """Broadcast scene update to all connected clients.
+        
+        Args:
+            scene_xml: MuJoCo XML content for the scene
+        """
+        self.current_scene_xml = scene_xml
+        
+        # Try to load the scene in the simulation
+        try:
+            if hasattr(self.simulation, 'load_from_xml_string'):
+                self.simulation.load_from_xml_string(scene_xml)
+                logger.info("Scene loaded into simulation")
+            else:
+                logger.warning("Simulation does not support XML loading")
+        except Exception as e:
+            logger.error(f"Failed to load scene into simulation: {e}")
+        
+        # Broadcast to all connected WebSocket clients
+        message = {
+            "type": "scene_updated",
+            "xml": scene_xml
+        }
+        
+        disconnected_clients = []
+        for client_id, websocket in self.websockets.items():
+            try:
+                await self._send_to_client(client_id, message)
+            except Exception as e:
+                logger.warning(f"Failed to send scene update to client {client_id}: {e}")
+                disconnected_clients.append(client_id)
+        
+        # Clean up disconnected clients
+        for client_id in disconnected_clients:
+            await self._cleanup_client(client_id)

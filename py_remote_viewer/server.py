@@ -140,6 +140,38 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
             "clients_connected": signaling_server.stats["clients_connected"],
         })
     
+    @app.post("/api/scene/load")
+    async def load_scene(request: Request):
+        """Load a scene from XML."""
+        try:
+            data = await request.json()
+            xml = data.get('xml')
+            
+            if not xml:
+                return JSONResponse({"error": "XML content is required"}, status_code=400)
+            
+            # Basic XML validation
+            try:
+                from xml.dom import minidom
+                minidom.parseString(xml)
+            except Exception as e:
+                return JSONResponse({"error": f"Invalid XML: {str(e)}"}, status_code=400)
+            
+            # Store the scene XML in the signaling server (could be used by simulation)
+            signaling_server.current_scene_xml = xml
+            
+            # Broadcast scene update to all connected clients
+            await signaling_server.broadcast_scene_update(xml)
+            
+            return JSONResponse({
+                "success": True,
+                "message": "Scene loaded successfully"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error loading scene: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+    
     @app.websocket("/ws/signaling")
     async def websocket_signaling(websocket: WebSocket):
         """WebSocket endpoint for WebRTC signaling."""

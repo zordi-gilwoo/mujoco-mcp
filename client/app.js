@@ -16,6 +16,9 @@ class RemoteViewer {
         this.frameCount = 0;
         this.eventCount = 0;
         
+        // Scene creation state
+        this.currentSceneXML = null;
+        
         // Mouse interaction state
         this.mouseState = {
             isDown: false,
@@ -73,6 +76,16 @@ class RemoteViewer {
             pauseSimBtn: document.getElementById('pause-sim-btn'),
             resetSimBtn: document.getElementById('reset-sim-btn'),
             
+            // Scene creation controls
+            scenePromptInput: document.getElementById('scene-prompt-input'),
+            scenePresetDropdown: document.getElementById('scene-preset-dropdown'),
+            generateSceneBtn: document.getElementById('generate-scene-btn'),
+            loadSceneBtn: document.getElementById('load-scene-btn'),
+            toggleXmlBtn: document.getElementById('toggle-xml-editor'),
+            xmlEditorContainer: document.getElementById('xml-editor-container'),
+            xmlEditor: document.getElementById('xml-editor'),
+            xmlValidationStatus: document.getElementById('xml-validation-status'),
+            
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
             
@@ -97,6 +110,22 @@ class RemoteViewer {
         this.elements.startSimBtn.addEventListener('click', () => this.sendCommand('start'));
         this.elements.pauseSimBtn.addEventListener('click', () => this.sendCommand('pause'));
         this.elements.resetSimBtn.addEventListener('click', () => this.sendCommand('reset'));
+        
+        // Scene creation controls
+        this.elements.scenePresetDropdown.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.elements.scenePromptInput.value = e.target.value;
+                this.handlePromptChange();
+            }
+        });
+        
+        this.elements.scenePromptInput.addEventListener('input', () => {
+            this.handlePromptChange();
+        });
+        
+        this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
+        this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
+        this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
         
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
@@ -646,6 +675,236 @@ class RemoteViewer {
                 this.updateUI();
             }
         }, 1000);
+    }
+    
+    /**
+     * Handle prompt input changes
+     */
+    handlePromptChange() {
+        const prompt = this.elements.scenePromptInput.value.trim();
+        this.elements.generateSceneBtn.disabled = !prompt;
+        
+        if (prompt) {
+            // Clear the dropdown selection if user is typing
+            this.elements.scenePresetDropdown.value = '';
+        }
+    }
+    
+    /**
+     * Generate scene XML from prompt
+     */
+    async generateScene() {
+        const prompt = this.elements.scenePromptInput.value.trim();
+        if (!prompt) return;
+        
+        this.elements.generateSceneBtn.disabled = true;
+        this.elements.generateSceneBtn.textContent = 'Generating...';
+        this.setValidationStatus('checking', 'Generating scene XML...');
+        
+        try {
+            // Map common prompts to scene types
+            const sceneMapping = {
+                'create a pendulum simulation': 'pendulum',
+                'create a double pendulum': 'double_pendulum', 
+                'create a cart pole simulation': 'cart_pole'
+            };
+            
+            const normalizedPrompt = prompt.toLowerCase();
+            let sceneType = null;
+            
+            // Find matching scene type
+            for (const [key, value] of Object.entries(sceneMapping)) {
+                if (normalizedPrompt.includes(key) || normalizedPrompt.includes(key.replace('create a ', ''))) {
+                    sceneType = value;
+                    break;
+                }
+            }
+            
+            if (!sceneType) {
+                throw new Error('Scene type not recognized. Try: "Create a pendulum simulation", "Create a double pendulum", or "Create a cart pole simulation"');
+            }
+            
+            // Generate the XML based on scene type
+            const xml = this.generateSceneXML(sceneType);
+            
+            // Update the XML editor
+            this.elements.xmlEditor.value = xml;
+            this.currentSceneXML = xml;
+            
+            // Validate the XML
+            await this.validateXML(xml);
+            
+            // Enable load button
+            this.elements.loadSceneBtn.disabled = false;
+            
+            // Show XML editor if collapsed
+            if (this.elements.xmlEditorContainer.classList.contains('collapsed')) {
+                this.toggleXmlEditor();
+            }
+            
+            this.logEvent('Scene', `Generated ${sceneType} scene from prompt: "${prompt}"`);
+            
+        } catch (error) {
+            this.setValidationStatus('invalid', `Error: ${error.message}`);
+            this.logEvent('Error', `Scene generation failed: ${error.message}`);
+        } finally {
+            this.elements.generateSceneBtn.disabled = false;
+            this.elements.generateSceneBtn.textContent = 'Generate Scene';
+        }
+    }
+    
+    /**
+     * Generate MuJoCo XML for scene type
+     */
+    generateSceneXML(sceneType) {
+        const sceneTemplates = {
+            'pendulum': `<mujoco>
+    <worldbody>
+        <body name="pole" pos="0 0 1">
+            <joint name="hinge" type="hinge" axis="1 0 0"/>
+            <geom name="pole" type="capsule" size="0.02 0.6" rgba="0.8 0.2 0.2 1"/>
+            <body name="mass" pos="0 0 -0.6">
+                <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            'double_pendulum': `<mujoco>
+    <worldbody>
+        <body name="pole1" pos="0 0 1">
+            <joint name="hinge1" type="hinge" axis="1 0 0"/>
+            <geom name="pole1" type="capsule" size="0.02 0.4" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole2" pos="0 0 -0.4">
+                <joint name="hinge2" type="hinge" axis="1 0 0"/>
+                <geom name="pole2" type="capsule" size="0.02 0.4" rgba="0.2 0.8 0.2 1"/>
+                <body name="mass" pos="0 0 -0.4">
+                    <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            'cart_pole': `<mujoco>
+    <worldbody>
+        <body name="cart" pos="0 0 0.1">
+            <joint name="slider" type="slide" axis="1 0 0"/>
+            <geom name="cart" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole" pos="0 0 0.1">
+                <joint name="hinge" type="hinge" axis="0 1 0"/>
+                <geom name="pole" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`
+        };
+        
+        return sceneTemplates[sceneType] || '';
+    }
+    
+    /**
+     * Load scene into viewer
+     */
+    async loadScene() {
+        if (!this.currentSceneXML) return;
+        
+        this.elements.loadSceneBtn.disabled = true;
+        this.elements.loadSceneBtn.textContent = 'Loading...';
+        
+        try {
+            // Send scene to server via API
+            const response = await fetch('/api/scene/load', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    xml: this.currentSceneXML
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.logEvent('Scene', 'Scene loaded into viewer successfully');
+                
+                // Also send through WebRTC for real-time updates if connected
+                if (this.isConnected) {
+                    this.sendEvent({
+                        type: 'load_scene',
+                        xml: this.currentSceneXML
+                    });
+                }
+            } else {
+                throw new Error(result.error || 'Failed to load scene');
+            }
+            
+        } catch (error) {
+            this.logEvent('Error', `Failed to load scene: ${error.message}`);
+        } finally {
+            this.elements.loadSceneBtn.disabled = false;
+            this.elements.loadSceneBtn.textContent = 'Load Scene';
+        }
+    }
+    
+    /**
+     * Toggle XML editor visibility
+     */
+    toggleXmlEditor() {
+        const container = this.elements.xmlEditorContainer;
+        const btn = this.elements.toggleXmlBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide XML';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show XML';
+        }
+    }
+    
+    /**
+     * Validate XML content
+     */
+    async validateXML(xml) {
+        try {
+            // Basic XML structure validation
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            
+            // Check for parsing errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                throw new Error('Invalid XML structure');
+            }
+            
+            // Check if it's a MuJoCo XML (has mujoco root element)
+            const mujocoRoot = doc.querySelector('mujoco');
+            if (!mujocoRoot) {
+                throw new Error('Not a valid MuJoCo XML (missing <mujoco> root element)');
+            }
+            
+            // Check for required worldbody
+            const worldbody = doc.querySelector('worldbody');
+            if (!worldbody) {
+                throw new Error('Missing <worldbody> element');
+            }
+            
+            this.setValidationStatus('valid', 'Valid MuJoCo XML');
+            return true;
+            
+        } catch (error) {
+            this.setValidationStatus('invalid', `Validation error: ${error.message}`);
+            return false;
+        }
+    }
+    
+    /**
+     * Set validation status display
+     */
+    setValidationStatus(status, message) {
+        const statusElement = this.elements.xmlValidationStatus;
+        statusElement.className = `validation-status ${status}`;
+        statusElement.textContent = message;
     }
 }
 

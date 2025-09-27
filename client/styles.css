@@ -352,25 +352,141 @@ button:active {
     object-fit: contain;
 }
 
+/* Input Fields */
+.text-input {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #1a1a1a;
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: #4CAF50;
+    box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+}
+
+.dropdown {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #1a1a1a;
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+}
+
+.dropdown:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+/* XML Editor */
+.xml-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.toggle-btn {
+    background-color: #666;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.toggle-btn:hover {
+    background-color: #777;
+}
+
+.xml-editor-container {
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.xml-editor-container.collapsed {
+    max-height: 0;
+    border: none;
+}
+
+.xml-editor-container:not(.collapsed) {
+    max-height: 300px;
+}
+
+.xml-editor {
+    width: 100%;
+    height: 250px;
+    padding: 0.75rem;
+    background-color: #1a1a1a;
+    border: none;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+.xml-editor:focus {
+    outline: none;
+    background-color: #222;
+}
+
+.validation-status {
+    padding: 0.5rem;
+    background-color: #2d2d2d;
+    border-top: 1px solid #3d3d3d;
+    font-size: 0.8rem;
+    min-height: 1.5rem;
+}
+
+.validation-status.valid {
+    color: #4CAF50;
+}
+
+.validation-status.invalid {
+    color: #f44336;
+}
+
+.validation-status.checking {
+    color: #ff9800;
+}
+
 /* Scrollbar styling for WebKit browsers */
 .event-log::-webkit-scrollbar,
-.control-panel::-webkit-scrollbar {
+.control-panel::-webkit-scrollbar,
+.xml-editor::-webkit-scrollbar {
     width: 8px;
 }
 
 .event-log::-webkit-scrollbar-track,
-.control-panel::-webkit-scrollbar-track {
+.control-panel::-webkit-scrollbar-track,
+.xml-editor::-webkit-scrollbar-track {
     background: #1a1a1a;
     border-radius: 4px;
 }
 
 .event-log::-webkit-scrollbar-thumb,
-.control-panel::-webkit-scrollbar-thumb {
+.control-panel::-webkit-scrollbar-thumb,
+.xml-editor::-webkit-scrollbar-thumb {
     background: #4CAF50;
     border-radius: 4px;
 }
 
 .event-log::-webkit-scrollbar-thumb:hover,
-.control-panel::-webkit-scrollbar-thumb:hover {
+.control-panel::-webkit-scrollbar-thumb:hover,
+.xml-editor::-webkit-scrollbar-thumb:hover {
     background: #45a049;
 }
