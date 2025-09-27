@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MuJoCo Remote Viewer</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
@@ -75,8 +75,68 @@
                             <button id="toggle-xml-editor" class="toggle-btn">Show XML</button>
                         </div>
                         <div id="xml-editor-container" class="xml-editor-container collapsed">
-                            <textarea id="xml-editor" class="xml-editor" readonly placeholder="Scene XML will appear here..."></textarea>
+                            <div class="editor-tabs">
+                                <button class="tab-button active" data-tab="xml">XML</button>
+                                <button class="tab-button" data-tab="python">Python RL Env</button>
+                            </div>
+                            <div class="tab-content">
+                                <div id="xml-tab" class="tab-pane active">
+                                    <textarea id="xml-editor" class="xml-editor" readonly placeholder="Scene XML will appear here..."></textarea>
+                                </div>
+                                <div id="python-tab" class="tab-pane">
+                                    <textarea id="python-editor" class="python-editor" placeholder="Python RL environment code will appear here..."></textarea>
+                                </div>
+                            </div>
                             <div id="xml-validation-status" class="validation-status"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>RL Environment Creation</h3>
+                    <div class="control-group">
+                        <label for="rl-prompt-input">RL Environment Prompt:</label>
+                        <input type="text" id="rl-prompt-input" class="text-input" placeholder="Describe your RL environment...">
+                        <label for="rl-preset-dropdown">Or choose a preset RL environment:</label>
+                        <select id="rl-preset-dropdown" class="dropdown">
+                            <option value="">Select an RL environment...</option>
+                            <option value="franka_reaching">Franka Panda Reaching Task</option>
+                            <option value="cart_pole_balancing">Cart-Pole Balancing</option>
+                            <option value="quadruped_walking">Quadruped Walking</option>
+                            <option value="simple_arm_reaching">Simple Arm Reaching</option>
+                        </select>
+                        <div class="button-group">
+                            <button id="generate-rl-env-btn">Generate RL Env</button>
+                            <button id="load-rl-env-btn" disabled>Load RL Env</button>
+                            <button id="run-random-actions-btn" disabled>▶ Run Random Actions</button>
+                            <button id="stop-rl-env-btn" disabled>⏹ Stop</button>
+                        </div>
+                    </div>
+                    
+                    <!-- RL Environment Guidelines -->
+                    <div class="control-group">
+                        <div class="guidelines-header">
+                            <label>RL Environment Creation Guidelines:</label>
+                            <button id="toggle-guidelines" class="toggle-btn">Show Guidelines</button>
+                        </div>
+                        <div id="guidelines-container" class="guidelines-container collapsed">
+                            <div class="guidelines-content">
+                                <h4>Structure your RL environment prompt with:</h4>
+                                <ul>
+                                    <li><strong>Task Type:</strong> reaching, balancing, walking, manipulation</li>
+                                    <li><strong>Robot Type:</strong> franka_panda, cart_pole, quadruped, simple_arm</li>
+                                    <li><strong>Observation Space:</strong> joint positions, velocities, end-effector pose</li>
+                                    <li><strong>Action Space:</strong> joint torques, position commands, velocity commands</li>
+                                    <li><strong>Reward Function:</strong> distance to target, stability, efficiency</li>
+                                    <li><strong>Episode Termination:</strong> task completion, time limit, failure conditions</li>
+                                </ul>
+                                <h4>Example Prompts:</h4>
+                                <ul>
+                                    <li>"Create a reaching task for Franka Panda to reach random targets"</li>
+                                    <li>"Design a cart-pole balancing environment with discrete actions"</li>
+                                    <li>"Build a quadruped walking environment with gait rewards"</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -127,6 +187,6 @@
         </footer>
     </div>
 
-    <script src="/static/app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

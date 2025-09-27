@@ -18,6 +18,8 @@ class RemoteViewer {
         
         // Scene creation state
         this.currentSceneXML = null;
+        this.currentRLEnvironment = null;
+        this.isRLRunning = false;
         
         // Mouse interaction state
         this.mouseState = {
@@ -86,6 +88,24 @@ class RemoteViewer {
             xmlEditor: document.getElementById('xml-editor'),
             xmlValidationStatus: document.getElementById('xml-validation-status'),
             
+            // Tab system
+            tabButtons: document.querySelectorAll('.tab-button'),
+            tabPanes: document.querySelectorAll('.tab-pane'),
+            xmlTab: document.getElementById('xml-tab'),
+            pythonTab: document.getElementById('python-tab'),
+            xmlTabEditor: document.getElementById('xml-editor'),
+            pythonEditor: document.getElementById('python-editor'),
+            
+            // RL Environment controls
+            rlPromptInput: document.getElementById('rl-prompt-input'),
+            rlPresetDropdown: document.getElementById('rl-preset-dropdown'),
+            generateRlEnvBtn: document.getElementById('generate-rl-env-btn'),
+            loadRlEnvBtn: document.getElementById('load-rl-env-btn'),
+            runRandomActionsBtn: document.getElementById('run-random-actions-btn'),
+            stopRlEnvBtn: document.getElementById('stop-rl-env-btn'),
+            toggleGuidelinesBtn: document.getElementById('toggle-guidelines'),
+            guidelinesContainer: document.getElementById('guidelines-container'),
+            
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
             
@@ -126,6 +146,28 @@ class RemoteViewer {
         this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
         this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
         this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
+        
+        // Tab system
+        this.elements.tabButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+        });
+        
+        // RL Environment controls
+        this.elements.rlPresetDropdown.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.handleRLPresetChange(e.target.value);
+            }
+        });
+        
+        this.elements.rlPromptInput.addEventListener('input', () => {
+            this.handleRLPromptChange();
+        });
+        
+        this.elements.generateRlEnvBtn.addEventListener('click', () => this.generateRLEnvironment());
+        this.elements.loadRlEnvBtn.addEventListener('click', () => this.loadRLEnvironment());
+        this.elements.runRandomActionsBtn.addEventListener('click', () => this.runRandomActions());
+        this.elements.stopRlEnvBtn.addEventListener('click', () => this.stopRLEnvironment());
+        this.elements.toggleGuidelinesBtn.addEventListener('click', () => this.toggleGuidelines());
         
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
@@ -859,6 +901,408 @@ class RemoteViewer {
         } else {
             container.classList.add('collapsed');
             btn.textContent = 'Show XML';
+        }
+    }
+    
+    /**
+     * Switch between XML and Python tabs
+     */
+    switchTab(tabName) {
+        // Update tab buttons
+        this.elements.tabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+        
+        // Update tab panes
+        this.elements.tabPanes.forEach(pane => {
+            pane.classList.toggle('active', pane.id === `${tabName}-tab`);
+        });
+    }
+    
+    /**
+     * Handle RL preset dropdown change
+     */
+    handleRLPresetChange(presetValue) {
+        const presetPrompts = {
+            'franka_reaching': 'Create a reaching task for Franka Panda to reach random targets with continuous actions',
+            'cart_pole_balancing': 'Design a cart-pole balancing environment with discrete actions',
+            'quadruped_walking': 'Build a quadruped walking environment with gait rewards',
+            'simple_arm_reaching': 'Create a simple 2-DOF arm reaching task with sparse rewards'
+        };
+        
+        if (presetPrompts[presetValue]) {
+            this.elements.rlPromptInput.value = presetPrompts[presetValue];
+            this.handleRLPromptChange();
+        }
+    }
+    
+    /**
+     * Handle RL prompt input change
+     */
+    handleRLPromptChange() {
+        const prompt = this.elements.rlPromptInput.value.trim();
+        this.elements.generateRlEnvBtn.disabled = !prompt;
+    }
+    
+    /**
+     * Generate RL environment from prompt
+     */
+    async generateRLEnvironment() {
+        const prompt = this.elements.rlPromptInput.value.trim();
+        if (!prompt) return;
+        
+        this.elements.generateRlEnvBtn.disabled = true;
+        this.elements.generateRlEnvBtn.textContent = 'Generating...';
+        
+        try {
+            this.logEvent('Generating RL environment...', 'info');
+            
+            // Parse the prompt to determine environment type
+            const envConfig = this.parseRLPrompt(prompt);
+            
+            // Generate the XML for the environment  
+            const xml = this.generateRLEnvironmentXML(envConfig);
+            this.currentSceneXML = xml;
+            this.elements.xmlTabEditor.value = xml;
+            
+            // Generate the Python gymnasium environment code
+            const pythonCode = this.generateRLEnvironmentPython(envConfig);
+            this.elements.pythonEditor.value = pythonCode;
+            this.currentRLEnvironment = { config: envConfig, python: pythonCode };
+            
+            // Update UI
+            this.elements.loadRlEnvBtn.disabled = false;
+            this.elements.runRandomActionsBtn.disabled = false;
+            
+            // Switch to Python tab to show the generated code
+            this.switchTab('python');
+            
+            // Show the XML editor if not already visible
+            if (this.elements.xmlEditorContainer.classList.contains('collapsed')) {
+                this.toggleXmlEditor();
+            }
+            
+            this.logEvent(`RL environment generated: ${envConfig.task_type} with ${envConfig.robot_type}`, 'success');
+            
+        } catch (error) {
+            this.logEvent(`Failed to generate RL environment: ${error.message}`, 'error');
+        } finally {
+            this.elements.generateRlEnvBtn.disabled = false;
+            this.elements.generateRlEnvBtn.textContent = 'Generate RL Env';
+        }
+    }
+    
+    /**
+     * Parse RL prompt to extract environment configuration
+     */
+    parseRLPrompt(prompt) {
+        const config = {
+            task_type: 'reaching',
+            robot_type: 'simple_arm',
+            action_space_type: 'continuous',
+            max_episode_steps: 1000,
+            reward_scale: 1.0
+        };
+        
+        const promptLower = prompt.toLowerCase();
+        
+        // Detect task type
+        if (promptLower.includes('reach')) config.task_type = 'reaching';
+        else if (promptLower.includes('balanc')) config.task_type = 'balancing';
+        else if (promptLower.includes('walk')) config.task_type = 'walking';
+        else if (promptLower.includes('manipulat')) config.task_type = 'manipulation';
+        
+        // Detect robot type
+        if (promptLower.includes('franka') || promptLower.includes('panda')) config.robot_type = 'franka_panda';
+        else if (promptLower.includes('cart') && promptLower.includes('pole')) config.robot_type = 'cart_pole';
+        else if (promptLower.includes('quadruped')) config.robot_type = 'quadruped';
+        else if (promptLower.includes('simple') && promptLower.includes('arm')) config.robot_type = 'simple_arm';
+        
+        // Detect action space type
+        if (promptLower.includes('discrete')) config.action_space_type = 'discrete';
+        else if (promptLower.includes('continuous')) config.action_space_type = 'continuous';
+        
+        return config;
+    }
+    
+    /**
+     * Generate XML for RL environment
+     */
+    generateRLEnvironmentXML(config) {
+        const xmlTemplates = {
+            franka_reaching: `<mujoco model="franka_reaching">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="base" pos="0 0 0">
+            <geom name="base_geom" type="cylinder" size="0.1 0.1" rgba="0.5 0.5 0.5 1"/>
+            <body name="link1" pos="0 0 0.1">
+                <joint name="joint1" type="hinge" axis="0 0 1"/>
+                <geom name="link1_geom" type="capsule" size="0.05 0.2" rgba="0.8 0.2 0.2 1"/>
+                <body name="link2" pos="0 0 0.2">
+                    <joint name="joint2" type="hinge" axis="0 1 0"/>
+                    <geom name="link2_geom" type="capsule" size="0.04 0.15" rgba="0.2 0.8 0.2 1"/>
+                    <body name="end_effector" pos="0 0 0.15">
+                        <geom name="ee_geom" type="sphere" size="0.03" rgba="1 0 0 1"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="target" pos="0.5 0.0 0.5">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>
+    </worldbody>
+</mujoco>`,
+            cart_pole: `<mujoco model="cartpole">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="cart" pos="0 0 0.1">
+            <joint name="slider" type="slide" axis="1 0 0" range="-2 2"/>
+            <geom name="cart_geom" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole" pos="0 0 0.1">
+                <joint name="hinge" type="hinge" axis="0 1 0" range="-1.57 1.57"/>
+                <geom name="pole_geom" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            quadruped: `<mujoco model="quadruped">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="torso" pos="0 0 0.3">
+            <geom name="torso_geom" type="box" size="0.2 0.1 0.05" rgba="0.8 0.2 0.2 1"/>
+            <body name="leg1" pos="0.15 0.08 -0.05">
+                <joint name="hip1" type="hinge" axis="0 1 0"/>
+                <geom name="leg1_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg2" pos="0.15 -0.08 -0.05">
+                <joint name="hip2" type="hinge" axis="0 1 0"/>
+                <geom name="leg2_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg3" pos="-0.15 0.08 -0.05">
+                <joint name="hip3" type="hinge" axis="0 1 0"/>
+                <geom name="leg3_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg4" pos="-0.15 -0.08 -0.05">
+                <joint name="hip4" type="hinge" axis="0 1 0"/>
+                <geom name="leg4_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            simple_arm: `<mujoco model="simple_arm">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="base" pos="0 0 0">
+            <geom name="base_geom" type="cylinder" size="0.1 0.1" rgba="0.5 0.5 0.5 1"/>
+            <body name="link1" pos="0 0 0.1">
+                <joint name="joint1" type="hinge" axis="0 0 1"/>
+                <geom name="link1_geom" type="capsule" size="0.05 0.2" rgba="0.8 0.2 0.2 1"/>
+                <body name="link2" pos="0 0 0.2">
+                    <joint name="joint2" type="hinge" axis="0 1 0"/>
+                    <geom name="link2_geom" type="capsule" size="0.04 0.15" rgba="0.2 0.8 0.2 1"/>
+                    <body name="end_effector" pos="0 0 0.15">
+                        <geom name="ee_geom" type="sphere" size="0.03" rgba="1 0 0 1"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="target" pos="0.3 0.0 0.3">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>
+    </worldbody>
+</mujoco>`
+        };
+        
+        if (config.robot_type === 'franka_panda') return xmlTemplates.franka_reaching;
+        if (config.robot_type === 'cart_pole') return xmlTemplates.cart_pole;
+        if (config.robot_type === 'quadruped') return xmlTemplates.quadruped;
+        return xmlTemplates.simple_arm;
+    }
+    
+    /**
+     * Generate Python gymnasium environment code
+     */
+    generateRLEnvironmentPython(config) {
+        return `#!/usr/bin/env python3
+"""
+Auto-generated RL Environment for ${config.task_type} task with ${config.robot_type}
+Generated by MuJoCo MCP Remote Viewer
+"""
+
+import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
+import time
+from mujoco_mcp.rl_integration import MuJoCoRLEnvironment, RLConfig
+
+def create_environment():
+    """Create and return the RL environment"""
+    config = RLConfig(
+        robot_type="${config.robot_type}",
+        task_type="${config.task_type}",
+        max_episode_steps=${config.max_episode_steps},
+        action_space_type="${config.action_space_type}",
+        reward_scale=${config.reward_scale}
+    )
+    return MuJoCoRLEnvironment(config)
+
+def run_random_actions(env, num_steps=1000):
+    """Run the environment with random actions"""
+    print(f"🤖 Running ${config.task_type} task with random actions...")
+    print(f"📊 Environment: ${config.robot_type}")
+    print(f"🎮 Action space: ${config.action_space_type}")
+    print("=" * 50)
+    
+    obs, info = env.reset()
+    total_reward = 0
+    
+    for step in range(num_steps):
+        # Sample random action
+        action = env.action_space.sample()
+        
+        # Execute action
+        obs, reward, terminated, truncated, info = env.step(action)
+        total_reward += reward
+        
+        # Print progress every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step:4d}: reward={reward:.3f}, total={total_reward:.3f}")
+        
+        # Reset if episode ends
+        if terminated or truncated:
+            print(f"Episode finished at step {step}")
+            obs, info = env.reset()
+            total_reward = 0
+        
+        # Small delay for visualization
+        time.sleep(0.01)
+    
+    print(f"✅ Completed {num_steps} steps")
+
+if __name__ == "__main__":
+    # Create environment
+    env = create_environment()
+    
+    print(f"Environment created successfully!")
+    print(f"Observation space: {env.observation_space}")
+    print(f"Action space: {env.action_space}")
+    
+    try:
+        # Run with random actions
+        run_random_actions(env, num_steps=1000)
+    finally:
+        env.close()
+`;
+    }
+    
+    /**
+     * Load RL environment to viewer
+     */
+    async loadRLEnvironment() {
+        if (!this.currentRLEnvironment) return;
+        
+        this.elements.loadRlEnvBtn.disabled = true;
+        this.elements.loadRlEnvBtn.textContent = 'Loading...';
+        
+        try {
+            // Load the XML to the viewer
+            await this.loadScene();
+            this.logEvent('RL environment loaded to viewer', 'success');
+        } catch (error) {
+            this.logEvent(`Failed to load RL environment: ${error.message}`, 'error');
+        } finally {
+            this.elements.loadRlEnvBtn.disabled = false;
+            this.elements.loadRlEnvBtn.textContent = 'Load RL Env';
+        }
+    }
+    
+    /**
+     * Run RL environment with random actions
+     */
+    async runRandomActions() {
+        if (!this.currentRLEnvironment || this.isRLRunning) return;
+        
+        this.isRLRunning = true;
+        this.elements.runRandomActionsBtn.disabled = true;
+        this.elements.stopRlEnvBtn.disabled = false;
+        this.elements.runRandomActionsBtn.textContent = '⏳ Running...';
+        
+        try {
+            this.logEvent('Starting RL environment with random actions...', 'info');
+            
+            // Send command to backend to start RL environment
+            const result = await this.sendRLCommand('start_random_actions', {
+                config: this.currentRLEnvironment.config,
+                xml: this.currentSceneXML
+            });
+            
+            if (result.success) {
+                this.logEvent('RL environment running with random actions', 'success');
+                this.startRLMonitoring();
+            } else {
+                throw new Error(result.error || 'Failed to start RL environment');
+            }
+            
+        } catch (error) {
+            this.logEvent(`Failed to run RL environment: ${error.message}`, 'error');
+            this.stopRLEnvironment();
+        }
+    }
+    
+    /**
+     * Stop RL environment
+     */
+    async stopRLEnvironment() {
+        if (!this.isRLRunning) return;
+        
+        try {
+            await this.sendRLCommand('stop_rl_environment');
+            this.logEvent('RL environment stopped', 'info');
+        } catch (error) {
+            this.logEvent(`Error stopping RL environment: ${error.message}`, 'error');
+        }
+        
+        this.isRLRunning = false;
+        this.elements.runRandomActionsBtn.disabled = false;
+        this.elements.stopRlEnvBtn.disabled = true;
+        this.elements.runRandomActionsBtn.textContent = '▶ Run Random Actions';
+    }
+    
+    /**
+     * Start monitoring RL environment performance
+     */
+    startRLMonitoring() {
+        // This would periodically check RL environment status
+        // For now, just update the UI to show it's running
+        this.logEvent('RL monitoring started', 'info');
+    }
+    
+    /**
+     * Send RL-specific command to backend
+     */
+    async sendRLCommand(command, data = {}) {
+        // This would send commands to a backend RL service
+        // For now, simulate the command
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({ success: true, data: {} });
+            }, 1000);
+        });
+    }
+    
+    /**
+     * Toggle guidelines visibility
+     */
+    toggleGuidelines() {
+        const container = this.elements.guidelinesContainer;
+        const btn = this.elements.toggleGuidelinesBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide Guidelines';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show Guidelines';
         }
     }
     
