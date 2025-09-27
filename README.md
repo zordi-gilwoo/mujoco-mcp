@@ -149,36 +149,44 @@ for _ in range(1000):
 
 ## 🚀 Advanced Setup
 
-### Multi-Client Process Pool Architecture
-The new process pool architecture enables truly isolated multi-client support:
+### Multi-Client Architecture Evolution
+MuJoCo MCP has evolved to support both session-based and process-based client isolation:
 
+**Original Architecture (Session-Based)**
 ```python
-# Automatic process isolation - each client gets its own process
-from mujoco_mcp.session_manager import SessionManager
+# Multiple clients share viewer server with session isolation
+session_manager = SessionManager(use_isolated_processes=False)
+# - Session ID isolation
+# - Port allocation (8889, 8890, etc.)
+# - Shared memory space
+# - Fast client connections
+```
 
-# Enable isolated processes (default in v0.8.2+)
+**Enhanced Architecture (Process-Based)** - *Default in v0.8.2+*
+```python
+# Each client gets dedicated viewer process 
 session_manager = SessionManager(use_isolated_processes=True)
-
-# Each client automatically gets:
 # - Dedicated viewer process (PID isolation)
 # - Unique port allocation (8001-9000)
-# - Independent simulation state
+# - Independent memory space  
+# - Complete crash isolation
 # - Automatic cleanup on disconnect
 ```
 
-**Key Benefits:**
+**Key Benefits of Process-Based Architecture:**
 - 🔒 **Complete Isolation**: Memory and process separation
-- 🔌 **Auto Port Management**: No manual configuration needed
-- 📊 **Health Monitoring**: Background process monitoring
+- 🔌 **Auto Port Management**: Dynamic port allocation and conflict prevention
+- 📊 **Health Monitoring**: Background process monitoring and auto-restart
 - 🧹 **Automatic Cleanup**: Resources freed on client disconnect
-- 🚀 **Scalable**: Support for hundreds of concurrent clients
+- 🚀 **Enterprise Scale**: Support for hundreds of concurrent clients
+- 🛡️ **Crash Protection**: One client failure doesn't affect others
 
 **New MCP Tools for Process Management:**
 - `get_process_pool_stats` - Process pool statistics and health
 - `list_active_processes` - Show all running viewer processes  
 - `terminate_process` - Manually terminate specific processes
 
-See [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for detailed documentation.
+See [ARCHITECTURE_EVOLUTION.md](ARCHITECTURE_EVOLUTION.md) for the complete evolution story and [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for technical details.
 
 ### Install MuJoCo Menagerie (for robot models)
 ```bash
