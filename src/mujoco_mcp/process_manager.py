@@ -297,8 +297,18 @@ class ProcessManager:
             }
 
 
-# Global process manager instance
-process_manager = ProcessManager()
+# Global process manager instance for production use
+# Manages isolated MuJoCo viewer processes with real viewer servers
+process_manager = ProcessManager(
+    port_range_start=8001,
+    port_range_end=9000,
+    use_mock_server=False
+)
 
-# Test process manager with mock server
-test_process_manager = ProcessManager(use_mock_server=True)
+# Test process manager with mock server for development and testing
+# Uses MockViewerServer to avoid MuJoCo dependencies during testing
+test_process_manager = ProcessManager(
+    port_range_start=8001,
+    port_range_end=9000,
+    use_mock_server=True
+)

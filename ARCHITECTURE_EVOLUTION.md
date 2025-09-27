@@ -168,3 +168,9 @@ ProcessManager(
 The enhancement **builds upon** rather than **replaces** the original multi-client architecture. It adds an optional layer of true process isolation while preserving all existing functionality. The result is a more robust, scalable, and secure multi-client platform suitable for enterprise deployments.
 
 **Key Principle**: Existing session-based isolation for compatibility, enhanced process-based isolation for production scalability.
+
+### Latest Improvements (v0.8.2+)
+- **Unified Demonstration**: Single demo showcasing both architectural approaches
+- **Enhanced Documentation**: Clear mode distinctions and usage recommendations  
+- **Streamlined Integration**: Cleaner code organization and reduced redundancy
+- **Production Ready**: Both approaches fully tested and documented for different deployment scenarios
