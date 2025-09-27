@@ -490,3 +490,130 @@ button:active {
 .xml-editor::-webkit-scrollbar-thumb:hover {
     background: #45a049;
 }
+
+/* Tabs Styling */
+.editor-tabs {
+    display: flex;
+    background-color: #2d2d2d;
+    border-bottom: 1px solid #3d3d3d;
+}
+
+.tab-button {
+    padding: 0.75rem 1rem;
+    background-color: transparent;
+    border: none;
+    color: #ccc;
+    cursor: pointer;
+    font-size: 0.9rem;
+    border-right: 1px solid #3d3d3d;
+    transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+    background-color: #3d3d3d;
+    color: #fff;
+}
+
+.tab-button.active {
+    background-color: #4CAF50;
+    color: #fff;
+}
+
+.tab-content {
+    position: relative;
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}
+
+.python-editor {
+    width: 100%;
+    height: 250px;
+    padding: 0.75rem;
+    background-color: #1a1a1a;
+    border: none;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    resize: vertical;
+    white-space: pre;
+    overflow-wrap: normal;
+}
+
+.python-editor:focus {
+    outline: none;
+    background-color: #222;
+}
+
+/* RL Environment Styling */
+.guidelines-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.guidelines-container {
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+
+.guidelines-container.collapsed {
+    max-height: 0;
+    border: none;
+}
+
+.guidelines-container:not(.collapsed) {
+    max-height: 400px;
+}
+
+.guidelines-content {
+    padding: 1rem;
+    background-color: #2a2a2a;
+    color: #ddd;
+}
+
+.guidelines-content h4 {
+    color: #4CAF50;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.guidelines-content ul {
+    margin-left: 1rem;
+    margin-bottom: 1rem;
+}
+
+.guidelines-content li {
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.guidelines-content strong {
+    color: #fff;
+}
+
+/* RL Environment Controls */
+#run-random-actions-btn {
+    background-color: #2196F3;
+}
+
+#run-random-actions-btn:hover:not(:disabled) {
+    background-color: #1976D2;
+}
+
+#stop-rl-env-btn {
+    background-color: #f44336;
+}
+
+#stop-rl-env-btn:hover:not(:disabled) {
+    background-color: #d32f2f;
+}
