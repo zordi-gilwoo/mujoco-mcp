@@ -29,12 +29,19 @@ class MuJoCoSimulation:
         self.data = None
         self.renderer = None
         self._initialized = False
+        self._initialization_error = None
         
         # Default to a simple pendulum if no model provided
         if model_xml is None:
             model_xml = self._get_default_model()
         
-        self.load_model(model_xml)
+        # Try to load model with graceful error handling
+        try:
+            self.load_model(model_xml)
+        except Exception as e:
+            self._initialization_error = str(e)
+            print(f"[MuJoCoSimulation] Failed to initialize: {e}")
+            print("[MuJoCoSimulation] Will continue with error frames")
     
     def _get_default_model(self) -> str:
         """Get a default MuJoCo model for demonstration."""
@@ -319,6 +326,7 @@ class MuJoCoSimulation:
             "camera": self.camera.to_dict(),
             "mujoco": {
                 "initialized": self._initialized,
+                "initialization_error": self._initialization_error,
                 "model_name": "default_pendulum" if self.model else None,
                 "nbody": self.model.nbody if self.model else 0,
                 "nq": self.model.nq if self.model else 0,

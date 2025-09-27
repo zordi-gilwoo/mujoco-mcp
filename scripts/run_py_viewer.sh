@@ -24,7 +24,6 @@ else
 fi
 
 # Set default environment variables
-export USE_SYNTHETIC_FRAMES="${USE_SYNTHETIC_FRAMES:-1}"
 export VIEWER_HOST="${VIEWER_HOST:-localhost}"
 export VIEWER_PORT="${VIEWER_PORT:-8000}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
@@ -33,7 +32,6 @@ export DEBUG_MODE="${DEBUG_MODE:-0}"
 echo "📋 Configuration:"
 echo "  Host: $VIEWER_HOST"
 echo "  Port: $VIEWER_PORT"
-echo "  Synthetic frames: $USE_SYNTHETIC_FRAMES"
 echo "  Log level: $LOG_LEVEL"
 echo "  Debug mode: $DEBUG_MODE"
 

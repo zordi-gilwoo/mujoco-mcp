@@ -22,7 +22,6 @@ class ViewerConfig:
     stun_server: str = "stun:stun.l.google.com:19302"
     
     # Development settings
-    use_synthetic_frames: bool = False  # Changed default to use real MuJoCo
     debug_mode: bool = False
     
     # Logging settings
@@ -38,7 +37,6 @@ class ViewerConfig:
             frame_height=int(os.getenv("FRAME_HEIGHT", str(cls.frame_height))),
             frame_rate=int(os.getenv("FRAME_RATE", str(cls.frame_rate))),
             stun_server=os.getenv("STUN_SERVER", cls.stun_server),
-            use_synthetic_frames=os.getenv("USE_SYNTHETIC_FRAMES", "0") == "1",
             debug_mode=os.getenv("DEBUG_MODE", "0") == "1",
             log_level=os.getenv("LOG_LEVEL", cls.log_level),
         )
@@ -52,7 +50,6 @@ class ViewerConfig:
             "frame_height": self.frame_height,
             "frame_rate": self.frame_rate,
             "stun_server": self.stun_server,
-            "use_synthetic_frames": self.use_synthetic_frames,
             "debug_mode": self.debug_mode,
             "log_level": self.log_level,
         }

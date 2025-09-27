@@ -9,7 +9,7 @@ from aiortc import RTCPeerConnection, RTCSessionDescription
 from aiortc.contrib.media import MediaPlayer
 
 from .config import ViewerConfig
-from .webrtc_track import SyntheticVideoTrack, MuJoCoVideoTrack
+from .webrtc_track import MuJoCoVideoTrack
 from .events import EventProtocol
 from .mujoco_simulation import MuJoCoSimulation
 
@@ -22,13 +22,15 @@ class SignalingServer:
     def __init__(self, config: ViewerConfig):
         self.config = config
         
-        # Use real MuJoCo simulation or fallback to synthetic frames
-        if config.use_synthetic_frames:
-            print("[SignalingServer] Using synthetic frames for development")
-            from .simulation_stub import SimulationStub
-            self.simulation = SimulationStub()
-        else:
-            print("[SignalingServer] Using real MuJoCo simulation")
+        # Always use real MuJoCo simulation with graceful error handling
+        print("[SignalingServer] Initializing MuJoCo simulation")
+        try:
+            self.simulation = MuJoCoSimulation()
+            print("[SignalingServer] MuJoCo simulation initialized successfully")
+        except Exception as e:
+            print(f"[SignalingServer] WARNING: MuJoCo simulation failed to initialize: {e}")
+            print("[SignalingServer] Server will continue but video frames may show errors")
+            # Still create the simulation object but it will handle errors gracefully
             self.simulation = MuJoCoSimulation()
         
         # Connection management
@@ -133,12 +135,8 @@ class SignalingServer:
                     "candidate": candidate.to_dict()
                 })
         
-        # Add video track
-        if self.config.use_synthetic_frames:
-            video_track = SyntheticVideoTrack(self.config)
-        else:
-            # Use real MuJoCo rendering
-            video_track = MuJoCoVideoTrack(self.config, self.simulation)
+        # Add video track - always use MuJoCo
+        video_track = MuJoCoVideoTrack(self.config, self.simulation)
         
         pc.addTrack(video_track)
         

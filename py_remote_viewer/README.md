@@ -4,7 +4,7 @@ A fully Python-based, headless, browser-accessible MuJoCo viewer scaffold that e
 
 ## 🎯 Overview
 
-This is a fully Python-based, headless, browser-accessible MuJoCo viewer that provides a complete WebRTC-based remote viewing solution. The system enables running simulations on headless servers with real-time browser interaction, combining synthetic frame generation for development with full MuJoCo physics simulation capabilities.
+This is a fully Python-based, headless, browser-accessible MuJoCo viewer that provides a complete WebRTC-based remote viewing solution. The system enables running simulations on headless servers with real-time browser interaction and full MuJoCo physics simulation capabilities.
 
 ## ✨ Features
 
@@ -13,7 +13,7 @@ This is a fully Python-based, headless, browser-accessible MuJoCo viewer that pr
 - **Camera Management**: Orbit/pan/zoom camera controls with presets
 - **Simulation Interface**: Start/pause/reset simulation controls
 - **Event Protocol**: JSON-based event system for all interactions
-- **Synthetic Frames**: Colorful test pattern generation for development
+- **MuJoCo Physics**: Real physics simulation with graceful error handling
 - **Web Interface**: Modern, responsive HTML/CSS/JS client
 - **FastAPI Server**: High-performance async web server
 - **Configuration**: Environment-based configuration system
@@ -37,11 +37,8 @@ The remote viewer now includes full MuJoCo physics simulation:
 
 ### Configuration
 ```bash
-# Use real MuJoCo simulation (default)
-USE_SYNTHETIC_FRAMES=0 ./scripts/run_py_viewer.sh
-
-# Use synthetic frames for development/testing
-USE_SYNTHETIC_FRAMES=1 ./scripts/run_py_viewer.sh
+# Start MuJoCo remote viewer (default)
+./scripts/run_py_viewer.sh
 ```
 
 ## 🏗 Architecture
@@ -68,7 +65,7 @@ USE_SYNTHETIC_FRAMES=1 ./scripts/run_py_viewer.sh
 
 - **`server.py`**: FastAPI application with WebRTC signaling
 - **`signaling.py`**: WebSocket-based WebRTC signaling server
-- **`webrtc_track.py`**: Video stream track with synthetic frame generation
+- **`webrtc_track.py`**: Video track implementation
 - **`events.py`**: Event protocol definitions and parsing
 - **`camera_state.py`**: Camera state management and controls
 - **`simulation_stub.py`**: Placeholder simulation interface
@@ -115,7 +112,7 @@ VIEWER_PORT=8080 DEBUG_MODE=1 ./scripts/run_py_viewer.sh
 ### Web Interface
 
 1. **Connect**: Click "Connect" to establish WebRTC connection
-2. **View**: See the synthetic video stream with animated patterns
+2. **View**: Watch the MuJoCo physics simulation
 3. **Interact**: 
    - Left-click + drag to rotate camera
    - Right-click + drag to pan camera
@@ -151,7 +148,7 @@ export FRAME_HEIGHT="480"
 export FRAME_RATE="30"
 
 # Development settings
-export USE_SYNTHETIC_FRAMES="1"
+export DEBUG_MODE="0"
 export DEBUG_MODE="0"
 export LOG_LEVEL="INFO"
 
@@ -168,7 +165,6 @@ config = ViewerConfig(
     frame_width=640,           # Video frame width
     frame_height=480,          # Video frame height
     frame_rate=30,             # Target frame rate
-    use_synthetic_frames=True, # Use synthetic frames
     debug_mode=False,          # Enable debug logging
     log_level="INFO"           # Logging level
 )
@@ -270,7 +266,7 @@ The system uses a JSON-based event protocol for all interactions:
 1. ✅ Replace `SimulationStub` with real MuJoCo simulation
 2. ✅ Implement MuJoCo model loading and physics simulation
 3. ✅ Add frame capture interface (with headless fallback)
-4. ✅ Replace `SyntheticVideoTrack` with `MuJoCoVideoTrack`
+4. ✅ Replace `SyntheticVideoTrack` with `MuJoCoVideoTrack` (COMPLETED)
 
 **Current Status:** The remote viewer now supports real MuJoCo physics simulation! The system can:
 - Load and run MuJoCo models with full physics simulation
@@ -282,9 +278,6 @@ The system uses a JSON-based event protocol for all interactions:
 ```bash
 # Use real MuJoCo simulation (default)
 ./scripts/run_py_viewer.sh
-
-# Force synthetic frames for development
-USE_SYNTHETIC_FRAMES=1 ./scripts/run_py_viewer.sh
 ```
 
 ### 🔄 **Phase 2: Performance Optimization (Next)**
@@ -314,7 +307,7 @@ The server reports metrics every 5 seconds:
 - Connected clients count
 - Total connection attempts
 - Events received count
-- Frame generation rate (synthetic)
+- Frame generation rate (MuJoCo)
 - Memory usage (future)
 
 Access metrics via:

@@ -30,7 +30,6 @@ def create_development_app():
         port=8000,
         debug_mode=True,
         log_level="DEBUG",
-        use_synthetic_frames=True,
     )
     
     return create_app(config)
@@ -43,7 +42,6 @@ def create_production_app():
         port=8000,
         debug_mode=False,
         log_level="INFO",
-        use_synthetic_frames=False,  # Would use real MuJoCo in production
     )
     
     return create_app(config)

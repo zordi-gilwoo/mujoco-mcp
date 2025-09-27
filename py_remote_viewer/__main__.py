@@ -33,12 +33,6 @@ def main():
     )
     
     parser.add_argument(
-        "--synthetic-frames",
-        action="store_true",
-        help="Use synthetic frames instead of MuJoCo rendering"
-    )
-    
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="Enable debug mode"
@@ -56,14 +50,11 @@ def main():
         config.port = args.port
     if args.log_level:
         config.log_level = args.log_level
-    if args.synthetic_frames:
-        config.use_synthetic_frames = True
     if args.debug:
         config.debug_mode = True
     
     print(f"🚀 Starting MuJoCo Remote Viewer")
     print(f"📍 Server: http://{config.host}:{config.port}")
-    print(f"🎨 Synthetic frames: {config.use_synthetic_frames}")
     print(f"🐛 Debug mode: {config.debug_mode}")
     print()
     
