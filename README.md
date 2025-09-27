@@ -1,5 +1,7 @@
 # MuJoCo MCP - Enterprise Robotics Simulation Platform
 
+(Gilwoo - making small edits)
+
 [![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
 [![MuJoCo](https://img.shields.io/badge/MuJoCo-2.3.0%2B-green.svg)](https://github.com/google-deepmind/mujoco)
