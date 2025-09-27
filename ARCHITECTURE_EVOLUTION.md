@@ -2,46 +2,48 @@
 
 ## Overview
 
-This document outlines the evolution of multi-client support in MuJoCo MCP, from the original session-based approach to the enhanced process-based isolation architecture.
+This document outlines the evolution of multi-client support in MuJoCo MCP, from the original session-based approach to the current unified process-based isolation architecture.
 
-## Stage 1: Original Multi-Client Architecture (Pre-Enhancement)
+## Stage 1: Original Multi-Client Architecture (Historical)
 
-### Key Components
-- **SessionManager** (`src/mujoco_mcp/session_manager.py`)
-- **ViewerManager** (`src/mujoco_mcp/viewer_client.py`)
-- **Demo & Tests** (`demo_multi_client.py`, `tests/test_multi_client.py`)
+### Key Components (Historical Reference)
+- **SessionManager** with dual-mode support
+- **ViewerManager** for multiple client connections
+- **Demo & Tests** with both approaches
 
-### Capabilities
+### Capabilities (Historical)
 ✅ **Session Isolation**: Each client gets unique session ID and port  
 ✅ **Client Management**: ViewerManager handles multiple client connections  
 ✅ **Port Allocation**: Sequential port assignment (8889, 8890, etc.)  
 ✅ **Resource Cleanup**: Session cleanup and stale session management  
 ✅ **Model Namespacing**: Session-prefixed model IDs prevent conflicts  
 
-### Architecture
+### Architecture (Historical)
 ```
-Client A → SessionManager → ViewerClient (port 8889) → Single Viewer Server Process
-Client B → SessionManager → ViewerClient (port 8890) → Single Viewer Server Process  
-Client C → SessionManager → ViewerClient (port 8891) → Single Viewer Server Process
+Client A → SessionManager → ViewerClient (port 8889) → Shared Viewer Server Process
+Client B → SessionManager → ViewerClient (port 8890) → Shared Viewer Server Process  
+Client C → SessionManager → ViewerClient (port 8891) → Shared Viewer Server Process
 ```
 
-**Limitation**: All clients share the same viewer server process, just with different ports and session isolation.
+**Limitation**: All clients shared the same viewer server process, with only session-level isolation.
 
-## Stage 2: Enhanced Process Pool Architecture (Current)
+## Stage 2: Current Unified Process-Based Architecture
 
-### New Components Added
+### Unified Components
 - **ProcessManager** (`src/mujoco_mcp/process_manager.py`)
-- **MockViewerServer** (`src/mujoco_mcp/mock_viewer_server.py`)
-- **Enhanced Tests** (`test_process_manager.py`, `test_simple_integration.py`)
+- **MockViewerServer** (`src/mujoco_mcp/mock_viewer_server.py`) 
+- **Simplified SessionManager** (process-based only)
+- **Process-Based Tests** (`test_process_manager.py`, `test_simple_integration.py`)
 
-### New Capabilities
+### Current Capabilities
 ✅ **True Process Isolation**: Each client gets dedicated Python process  
 ✅ **Advanced Port Management**: Dynamic availability checking (8001-9000 range)  
 ✅ **Process Health Monitoring**: Background threads monitor process health  
 ✅ **Automatic Process Cleanup**: Graceful termination and resource recovery  
 ✅ **MCP Integration**: New tools for process pool management  
+✅ **Enterprise Ready**: Complete isolation suitable for production deployments
 
-### Enhanced Architecture
+### Current Architecture
 ```
 Client A → SessionManager → ProcessManager → Dedicated Viewer Process (PID 1234, port 8001)
 Client B → SessionManager → ProcessManager → Dedicated Viewer Process (PID 1235, port 8002)
@@ -50,118 +52,85 @@ Client C → SessionManager → ProcessManager → Dedicated Viewer Process (PID
 
 **Benefit**: Complete process isolation - memory, CPU, crash isolation between clients.
 
-## What Changed vs What's New
+## What Changed vs What Was Simplified
 
-### Modified Files
+### SessionManager Simplification
 
-#### `src/mujoco_mcp/session_manager.py`
-**Original Features Preserved:**
-- Session creation and management
-- Port allocation logic
-- Session cleanup
-- Statistics gathering
+**Removed Features:**
+- `use_isolated_processes` flag and dual-mode support
+- Session-based port allocation (`_allocate_port()` method)
+- `get_recommended_isolation_mode()` method
+- `use_isolated_process` field in SessionInfo
+- Complex conditional logic for different isolation modes
 
-**Enhancements Added:**
-- `use_isolated_process` flag in SessionInfo
-- Integration with ProcessManager
-- Process information in session statistics
-- Process cleanup in session cleanup
+**Simplified Features:**
+- Always uses process-based isolation
+- Simplified constructor with no configuration options
+- Streamlined session creation and management
+- Cleaner get_viewer_client implementation
+- Unified statistics reporting
 
-#### `src/mujoco_mcp/viewer_server.py`
-**Original Features Preserved:**
-- Viewer server class proxy
-- Script path resolution
+### Demonstration Simplification
 
-**Enhancements Added:**
-- Command-line argument parsing for isolated mode
-- Support for --session-id and --isolated flags
+**Removed Files:**
+- `demo_multi_client_enhanced.py` (redundant)
+- Dual-mode demonstration functions
 
-#### `src/mujoco_mcp/mcp_server_menagerie.py`
-**Original Features Preserved:**
-- All existing MCP tools
-- Session management integration
+**New Simplified Demo:**
+- `demo_multi_client_process_based.py` - Shows only process-based approach
+- Sequential and concurrent client demonstrations
+- Cleaner, focused examples without mode comparison
 
-**Enhancements Added:**
-- ProcessManager import
-- New MCP tools: `get_process_pool_stats`, `list_active_processes`, `terminate_process`
+### Documentation Updates
 
-### New Files Added
+**Simplified Documentation:**
+- README focuses on process-based architecture only
+- Removed comparison sections and mode selection guidance
+- Streamlined setup instructions
+- Clearer feature descriptions
 
-#### `src/mujoco_mcp/process_manager.py`
-**Completely New**: Process spawning, health monitoring, port management
+## Configuration Simplification
 
-#### `src/mujoco_mcp/mock_viewer_server.py`
-**Completely New**: Testing infrastructure without MuJoCo dependencies
+### Before (Dual Mode)
+```python
+# Complex configuration with multiple options
+session_manager = SessionManager(use_isolated_processes=True)  # Process-based
+session_manager = SessionManager(use_isolated_processes=False) # Session-based
 
-#### Test Files
-- `test_process_manager.py` - New process manager tests
-- `test_simple_integration.py` - Integration tests
-- `demo_multi_client_enhanced.py` - Enhanced demo
+# Recommendation system
+recommended = SessionManager.get_recommended_isolation_mode(client_count=10, production=True)
+session_manager = SessionManager(use_isolated_processes=recommended)
+```
 
-#### Documentation
-- `PROCESS_POOL_ARCHITECTURE.md` - Technical architecture guide
-- `ARCHITECTURE_EVOLUTION.md` - This evolution document
-
-## Backward Compatibility
-
-The enhancement maintains **100% backward compatibility**:
-
-1. **Existing Code**: All existing MCP tools and APIs work unchanged
-2. **Configuration**: Can disable process isolation with `use_isolated_processes=False`
-3. **Tests**: Original multi-client tests continue to pass
-4. **Demos**: Original demo continues to work
+### After (Process-Based Only)
+```python
+# Simple, single configuration
+session_manager = SessionManager()  # Always process-based
+```
 
 ## Performance Impact
 
 ### Memory Usage
-- **Original**: ~50MB shared across all clients
-- **Enhanced**: ~50MB per client process (isolated)
+- **Before**: Variable (shared or isolated based on configuration)
+- **After**: ~50MB per client process (always isolated)
 
 ### Startup Time  
-- **Original**: Instant client connections
-- **Enhanced**: ~2 seconds per process spawn
+- **Before**: Variable (instant for session-based, ~2s for process-based)
+- **After**: ~2 seconds per process spawn (consistent)
 
-### Isolation Benefits
+### Isolation Benefits (Always Available)
 - **Crash Isolation**: One client crash doesn't affect others
 - **Memory Isolation**: No memory leaks between clients  
 - **Resource Isolation**: CPU and file handle isolation
 - **Security**: Process-level security boundaries
 
-## Configuration Options
-
-### Session-Based Isolation (Original)
-```python
-session_manager = SessionManager(use_isolated_processes=False)
-```
-
-### Process-Based Isolation (Enhanced) 
-```python
-session_manager = SessionManager(use_isolated_processes=True)  # Default
-```
-
-### Process Manager Configuration
-```python
-ProcessManager(
-    port_range_start=8001,
-    port_range_end=9000,
-    use_mock_server=False  # For testing
-)
-```
-
 ## Use Cases
 
-### When to Use Session-Based (Original)
-- Development and testing
-- Resource-constrained environments
-- When process isolation isn't critical
-- Single-user scenarios
-
-### When to Use Process-Based (Enhanced)
-- Production multi-tenant deployments
-- Enterprise environments with multiple AI agents
-- When crash isolation is critical
-- High-security requirements
-- Scalable cloud deployments
+### Recommended Deployment
+- **Production**: Process-based isolation provides enterprise-ready multi-tenancy
+- **Development**: Same architecture ensures consistency between dev and prod
+- **Testing**: Mock server allows testing without MuJoCo dependencies
+- **Enterprise**: Complete isolation suitable for multiple AI agents
 
 ## Summary
 

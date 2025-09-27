@@ -20,8 +20,8 @@ def test_session_process_integration():
     print("=" * 60)
     
     try:
-        # Create session manager with isolated processes
-        session_manager = SessionManager(use_isolated_processes=True)
+        # Create session manager with process-based isolation (simplified - always process-based)
+        session_manager = SessionManager()
         
         print("1. Testing session creation with process isolation...")
         
@@ -38,7 +38,7 @@ def test_session_process_integration():
             sessions.append(session)
             print(f"   ✅ Created session: {session.session_id}")
             print(f"      Client ID: {session.client_id}")
-            print(f"      Uses isolated process: {session.use_isolated_process}")
+            print(f"      Uses process-based isolation: Always enabled")
         
         print("\n2. Testing viewer client creation (spawns processes)...")
         for i, context in enumerate(contexts):
@@ -55,7 +55,7 @@ def test_session_process_integration():
         # Get session stats (includes process info)
         session_stats = session_manager.get_session_stats()
         print(f"   📊 Active sessions: {session_stats['active_sessions']}")
-        print(f"   🔧 Isolated process mode: {session_stats['isolated_process_mode']}")
+        print(f"   🔧 Isolation mode: {session_stats['isolation_mode']}")
         
         # Print process info from session stats
         for session_id, session_info in session_stats['sessions'].items():
