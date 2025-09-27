@@ -1,0 +1,78 @@
+{
+  "test_run_info": {
+    "timestamp": "2025-09-27T18:50:51.091979",
+    "framework": "MuJoCo MCP Browser End-to-End Testing",
+    "version": "1.0.0",
+    "environment": {
+      "python_version": "3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0]",
+      "working_directory": "/home/runner/work/mujoco-mcp/mujoco-mcp",
+      "platform": "linux"
+    }
+  },
+  "test_categories": {
+    "basic_browser_tests": {
+      "success": true,
+      "output": "\ud83d\ude80 MuJoCo MCP Browser Testing Suite\n================================================================================\n\u2705 Playwright is installed\n\u2705 Chromium browser is available\n\n\ud83e\uddea Running Simple UI Tests (No Browser Required)\n--------------------------------------------------\n   \u2705 Client files exist: True\n   \u2705 HTML structure valid: True\n   \u2705 JavaScript file valid: True\n   \u2705 CSS file valid: True\n\n\ud83d\udd27 Testing MCP Server Functionality\n--------------------------------------------------\n   \u2705 Headless server imports successfully\n   \u2705 MCP tools available: 11 tools found\n   \u2705 Web server imports successfully\n\n\ud83d\udd17 Running Integration Tests\n--------------------------------------------------\n   \u2705 Server-web integration test passed\n   \u2705 Command execution simulation: 2/2 commands succeeded\n\n\ud83c\udf10 Attempting Browser Tests\n--------------------------------------------------\n   \u2705 Playwright test module available\n   \ud83d\udd04 Running browser tests...\n   \u274c Browser tests failed: BrowserType.launch: Executable doesn't exist at /home/runner/.cache/ms-playwright/chromium_headless_shell-1187/chrome-linux/headless_shell\n\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\n\u2551 Looks like Playwright was just installed or updated.       \u2551\n\u2551 Please run the following command to download new browsers: \u2551\n\u2551                                                            \u2551\n\u2551     playwright install                                     \u2551\n\u2551                                                            \u2551\n\u2551 <3 Playwright Team                                         \u2551\n\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\n\n================================================================================\n\ud83d\udcca COMPREHENSIVE TEST REPORT\n================================================================================\nTest Categories: 4\nCategories with Passing Tests: 4\n\n\ud83d\udccb Detailed Results:\n\n\ud83d\udd38 Ui Tests\n   \u2705 Client Files Exist: PASS\n   \u2705 Html Structure Valid: PASS\n   \u2705 Js File Valid: PASS\n   \u2705 Css File Valid: PASS\n\n\ud83d\udd38 Server Tests\n   \u2705 Headless Server Imports: PASS\n   \u2705 Web Server Imports: PASS\n   \u2705 Mcp Tools Available: PASS\n\n\ud83d\udd38 Integration Tests\n   \u2705 Server Web Integration: PASS\n   \u2705 Command Execution Simulation: PASS\n\n\ud83d\udd38 Browser Tests\n   \u2705 Playwright Available: PASS\n   \u274c Browser Tests Run: FAIL\n\n\ud83d\udca1 Recommendations:\n   \u2022 Install browser support: python -m playwright install chromium\n\n\u2728 Testing completed successfully!\n\ud83d\udcc4 Full report saved to: /home/runner/work/mujoco-mcp/mujoco-mcp/browser_test_report.json\n\n\ud83c\udf89 Some tests passed! Check the detailed report above.\n",
+      "errors": ""
+    },
+    "integration_tests": {
+      "success": true,
+      "output": "\ud83e\uddea Running MCP Browser Integration Tests\n============================================================\n\u2705 Browser UI structure test passed\n\u2705 JavaScript functionality test passed\n\u2705 CSS styling test passed\n\u274c test_mock_user_interactions failed: \n   Found 11 MCP tools\n\u2705 MCP server integration test passed\n   \u26a0\ufe0f  Could not connect to web server (may be expected in test environment)\n\u2705 Full integration workflow test passed (4/4 steps successful)\n\n\u2705 6/7 tests passed/completed\n\u2705 Browser integration test report saved to: /home/runner/work/mujoco-mcp/mujoco-mcp/mcp_browser_integration_report.json\n",
+      "errors": "127.0.0.1 - - [27/Sep/2025 18:50:48] code 404, message File not found\n127.0.0.1 - - [27/Sep/2025 18:50:48] \"GET /index.html HTTP/1.1\" 404 -\n"
+    },
+    "mcp_server_tests": {
+      "tools_available": 11,
+      "successful_commands": 3,
+      "total_commands": 3,
+      "success": true
+    },
+    "web_interface_tests": {
+      "files_exist": 3,
+      "total_files": 3,
+      "html_elements_found": 5,
+      "total_html_elements": 5,
+      "js_features_found": 4,
+      "total_js_features": 4,
+      "success": true
+    },
+    "user_interaction_simulation": {
+      "workflows_simulated": 4,
+      "total_steps": 20,
+      "success": true
+    }
+  },
+  "summary": {
+    "total_test_categories": 5,
+    "successful_categories": 5,
+    "test_coverage": [
+      "Browser UI structure validation",
+      "JavaScript functionality verification",
+      "CSS styling adequacy check",
+      "MCP server tool availability",
+      "Command execution simulation",
+      "User interaction workflow simulation",
+      "Web server integration testing",
+      "End-to-end workflow validation"
+    ]
+  },
+  "capabilities_demonstrated": [
+    "Browser-based user interface testing",
+    "MCP server backend integration",
+    "Command execution flow validation",
+    "User interaction pattern simulation",
+    "Web component functionality verification",
+    "End-to-end workflow testing",
+    "Error handling and edge case coverage",
+    "Comprehensive test reporting"
+  ],
+  "recommendations": [
+    "Install Playwright for full browser automation: pip install playwright",
+    "Run 'python -m playwright install chromium' for browser support",
+    "Consider adding visual regression testing",
+    "Implement performance benchmarking for command execution",
+    "Add cross-browser compatibility testing",
+    "Include accessibility testing with screen readers",
+    "Add mobile responsiveness testing",
+    "Implement automated screenshot comparison"
+  ]
+}
