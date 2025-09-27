@@ -18,6 +18,7 @@ import mcp.types as types
 from .version import __version__
 from .viewer_client import MuJoCoViewerClient as ViewerClient
 from .menagerie_loader import MenagerieLoader
+from .session_manager import session_manager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -27,7 +28,6 @@ logger = logging.getLogger("mujoco-mcp-menagerie")
 server = Server("mujoco-mcp-menagerie")
 
 # Global instances
-viewer_client: Optional[ViewerClient] = None
 menagerie_loader = MenagerieLoader()
 
 @server.list_tools()
@@ -163,10 +163,19 @@ async def handle_list_tools() -> List[types.Tool]:
                 "properties": {
                     "model_id": {
                         "type": "string",
-                        "description": "ID of the model viewer to close"
+                        "description": "ID of the model viewer to close (optional - if not provided, closes entire session)"
                     }
                 },
-                "required": ["model_id"]
+                "required": []
+            }
+        ),
+        types.Tool(
+            name="get_session_info",
+            description="Get information about the current session and active models",
+            inputSchema={
+                "type": "object",
+                "properties": {},
+                "required": []
             }
         )
     ]
@@ -174,7 +183,6 @@ async def handle_list_tools() -> List[types.Tool]:
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
     """Handle tool calls with Menagerie support"""
-    global viewer_client
     
     try:
         if name == "get_server_info":
@@ -279,25 +287,28 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                 # Get the complete scene XML
                 scene_xml = menagerie_loader.create_scene_xml(model_name, scene_name)
                 
-                # Initialize viewer client if not exists
+                # Get session-specific viewer client
+                viewer_client = session_manager.get_viewer_client()
                 if not viewer_client:
-                    viewer_client = ViewerClient()
-                    
-                # Connect to viewer server
-                if not viewer_client.connected:
-                    success = viewer_client.connect()
-                    if not success:
-                        return [types.TextContent(
-                            type="text",
-                            text=f"❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first.\n✅ XML generated successfully for {model_name} ({len(scene_xml)} chars)"
-                        )]
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first.\n✅ XML generated successfully for {model_name} ({len(scene_xml)} chars)"
+                    )]
+                
+                # Create session-specific model ID to avoid conflicts
+                session = session_manager.get_or_create_session()
+                session_model_id = f"{session.session_id}_{scene_name}"
                 
                 # Load the model
                 response = viewer_client.send_command({
                     "type": "load_model",
-                    "model_id": scene_name,
+                    "model_id": session_model_id,
                     "model_xml": scene_xml
                 })
+                
+                # Track the model in session
+                if response.get("success"):
+                    session.active_models[scene_name] = model_name
                 
                 if response.get("success"):
                     return [types.TextContent(
@@ -329,18 +340,13 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             # Otherwise use built-in scenes (original logic)
             scene_type = arguments.get("scene_type", "pendulum")
             
-            # Initialize viewer client if not exists
+            # Get session-specific viewer client
+            viewer_client = session_manager.get_viewer_client()
             if not viewer_client:
-                viewer_client = ViewerClient()
-                
-            # Connect to viewer server
-            if not viewer_client.connected:
-                success = viewer_client.connect()
-                if not success:
-                    return [types.TextContent(
-                        type="text",
-                        text="❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first."
-                    )]
+                return [types.TextContent(
+                    type="text",
+                    text="❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first."
+                )]
             
             # Map scene types to model XML
             scene_models = {
@@ -396,21 +402,27 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     text=f"❌ Unknown scene type: {scene_type}. Available: {', '.join(scene_models.keys())}"
                 )]
             
+            # Create session-specific model ID to avoid conflicts
+            session = session_manager.get_or_create_session()
+            session_model_id = f"{session.session_id}_{scene_type}"
+            
             # Load the model
             response = viewer_client.send_command({
                 "type": "load_model",
-                "model_id": scene_type,
+                "model_id": session_model_id,
                 "model_xml": scene_models[scene_type]
             })
             
+            # Track the model in session
             if response.get("success"):
+                session.active_models[scene_type] = scene_type
                 return [types.TextContent(
                     type="text",
-                    text=f"✅ Created {scene_type} scene successfully! Viewer window opened."
+                    text=f"✅ Created {scene_type} scene successfully! Viewer window opened. Session: {session.client_id}"
                 )]
             else:
                 return [types.TextContent(
-                    type="text", 
+                    type="text",
                     text=f"❌ Failed to create scene: {response.get('error', 'Unknown error')}"
                 )]
                 
@@ -418,34 +430,52 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
             model_id = arguments.get("model_id")
             steps = arguments.get("steps", 1)
             
-            if not viewer_client or not viewer_client.connected:
+            # Get session-specific viewer client
+            viewer_client = session_manager.get_viewer_client()
+            if not viewer_client:
                 return [types.TextContent(
                     type="text",
                     text="❌ No active viewer connection. Create a scene first."
                 )]
+            
+            # Convert to session-specific model ID if needed
+            session = session_manager.get_or_create_session()
+            if model_id and not model_id.startswith(session.session_id):
+                session_model_id = f"{session.session_id}_{model_id}"
+            else:
+                session_model_id = model_id
                 
             # The viewer server doesn't have a direct step_simulation command
             # It automatically runs the simulation, so we just return success
-            response = {"success": True, "message": f"Simulation running for model {model_id}"}
+            response = {"success": True, "message": f"Simulation running for model {session_model_id}"}
             
             return [types.TextContent(
                 type="text",
-                text=f"⏩ Stepped simulation {steps} steps" if response.get("success") 
+                text=f"⏩ Stepped simulation {steps} steps for session {session.client_id}" if response.get("success") 
                      else f"❌ Step failed: {response.get('error')}"
             )]
             
         elif name == "get_state":
             model_id = arguments.get("model_id")
             
-            if not viewer_client or not viewer_client.connected:
+            # Get session-specific viewer client
+            viewer_client = session_manager.get_viewer_client()
+            if not viewer_client:
                 return [types.TextContent(
                     type="text",
                     text="❌ No active viewer connection. Create a scene first."
                 )]
+            
+            # Convert to session-specific model ID if needed
+            session = session_manager.get_or_create_session()
+            if model_id and not model_id.startswith(session.session_id):
+                session_model_id = f"{session.session_id}_{model_id}"
+            else:
+                session_model_id = model_id
                 
             response = viewer_client.send_command({
                 "type": "get_state",
-                "model_id": model_id
+                "model_id": session_model_id
             })
             
             if response.get("success"):
@@ -463,15 +493,24 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
         elif name == "reset_simulation":
             model_id = arguments.get("model_id")
             
-            if not viewer_client or not viewer_client.connected:
+            # Get session-specific viewer client
+            viewer_client = session_manager.get_viewer_client()
+            if not viewer_client:
                 return [types.TextContent(
                     type="text",
                     text="❌ No active viewer connection. Create a scene first."
                 )]
+            
+            # Convert to session-specific model ID if needed
+            session = session_manager.get_or_create_session()
+            if model_id and not model_id.startswith(session.session_id):
+                session_model_id = f"{session.session_id}_{model_id}"
+            else:
+                session_model_id = model_id
                 
             response = viewer_client.send_command({
                 "type": "reset",
-                "model_id": model_id
+                "model_id": session_model_id
             })
             
             return [types.TextContent(
@@ -483,26 +522,63 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
         elif name == "close_viewer":
             model_id = arguments.get("model_id")
             
-            if not viewer_client or not viewer_client.connected:
+            # Get session and clean up if model_id provided, otherwise clean up entire session
+            session = session_manager.get_session()
+            if not session:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ No active session found."
+                )]
+            
+            viewer_client = session_manager.get_viewer_client()
+            if not viewer_client:
                 return [types.TextContent(
                     type="text",
                     text="❌ No active viewer connection."
                 )]
-                
-            response = viewer_client.send_command({
-                "type": "close_model",
-                "model_id": model_id
-            })
             
-            # Close our connection too
-            if viewer_client:
-                viewer_client.disconnect()
-                viewer_client = None
+            if model_id:
+                # Close specific model
+                session_model_id = f"{session.session_id}_{model_id}" if not model_id.startswith(session.session_id) else model_id
+                response = viewer_client.send_command({
+                    "type": "close_model",
+                    "model_id": session_model_id
+                })
                 
+                # Remove from session tracking
+                if model_id in session.active_models:
+                    del session.active_models[model_id]
+                    
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ Model {model_id} closed for session {session.client_id}" if response.get("success")
+                         else f"❌ Failed to close model: {response.get('error')}"
+                )]
+            else:
+                # Close entire session
+                session_manager.cleanup_session()
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ Session {session.client_id} closed and cleaned up"
+                )]
+        
+        elif name == "get_session_info":
+            session = session_manager.get_or_create_session()
+            session_stats = session_manager.get_session_stats()
+            
             return [types.TextContent(
                 type="text",
-                text="✅ Viewer closed" if response.get("success")
-                     else f"❌ Failed to close: {response.get('error')}"
+                text=json.dumps({
+                    "current_session": {
+                        "session_id": session.session_id,
+                        "client_id": session.client_id,
+                        "viewer_port": session.viewer_port,
+                        "active_models": session.active_models,
+                        "created_at": session.created_at,
+                        "last_activity": session.last_activity
+                    },
+                    "all_sessions": session_stats
+                }, indent=2)
             )]
         
         else:
