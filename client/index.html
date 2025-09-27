@@ -56,7 +56,7 @@
                         <label for="freestyle-command-input">Natural Language Command:</label>
                         <div class="command-input-container">
                             <textarea id="freestyle-command-input" class="command-textarea" 
-                                    placeholder="Type any command in natural language...&#10;Examples:&#10;• Create a pendulum simulation&#10;• Load Franka Panda robot&#10;• Step simulation 100 times&#10;• Reset the simulation&#10;• Show current state"
+                                    placeholder="Type any command in natural language...&#10;Examples:&#10;• Create a pendulum simulation&#10;• Load Franka Panda robot&#10;• Step simulation 100 times&#10;• Create RL training for Franka reaching task&#10;• Show RL environment info"
                                     rows="3"></textarea>
                             <button id="execute-command-btn" class="execute-btn">Execute Command</button>
                         </div>
@@ -69,6 +69,12 @@
                                 <button class="suggestion-btn" data-command="Step simulation 50 times">Step 50x</button>
                                 <button class="suggestion-btn" data-command="Reset the simulation">Reset</button>
                                 <button class="suggestion-btn" data-command="Show current state">Get State</button>
+                            </div>
+                            <label>RL Commands:</label>
+                            <div class="suggestion-buttons">
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for Franka reaching task">RL Franka</button>
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for cart pole balancing">RL Cart Pole</button>
+                                <button class="suggestion-btn rl-btn" data-command="Show RL environment info">RL Info</button>
                             </div>
                         </div>
                         <div id="command-result" class="command-result"></div>
