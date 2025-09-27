@@ -89,6 +89,12 @@ class RemoteViewer {
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
             
+            // Free-style command interface
+            freestyleCommandInput: document.getElementById('freestyle-command-input'),
+            executeCommandBtn: document.getElementById('execute-command-btn'),
+            suggestionBtns: document.querySelectorAll('.suggestion-btn'),
+            commandResult: document.getElementById('command-result'),
+            
             // Event log and stats
             eventLog: document.getElementById('event-log'),
             statConnected: document.getElementById('stat-connected'),
@@ -136,6 +142,29 @@ class RemoteViewer {
                 } else {
                     this.sendCommand('set_camera_preset', { preset });
                 }
+            });
+        });
+        
+        // Free-style command interface
+        this.elements.executeCommandBtn.addEventListener('click', () => this.executeFreestyleCommand());
+        
+        this.elements.freestyleCommandInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                this.executeFreestyleCommand();
+            }
+        });
+        
+        this.elements.freestyleCommandInput.addEventListener('input', () => {
+            this.handleFreestyleInputChange();
+        });
+        
+        this.elements.suggestionBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const command = e.target.dataset.command;
+                this.elements.freestyleCommandInput.value = command;
+                this.handleFreestyleInputChange();
+                this.executeFreestyleCommand();
             });
         });
         
@@ -634,6 +663,9 @@ class RemoteViewer {
         // Video overlay
         this.elements.videoOverlay.classList.toggle('hidden', this.isConnected);
         
+        // Free-style command interface (always enabled - works independently of viewer connection)
+        this.handleFreestyleInputChange();
+        
         // Counters
         this.elements.frameCounter.textContent = `Frames: ${this.frameCount}`;
         this.elements.eventCounter.textContent = `Events: ${this.eventCount}`;
@@ -905,6 +937,87 @@ class RemoteViewer {
         const statusElement = this.elements.xmlValidationStatus;
         statusElement.className = `validation-status ${status}`;
         statusElement.textContent = message;
+    }
+    
+    /**
+     * Handle free-style command input changes
+     */
+    handleFreestyleInputChange() {
+        const command = this.elements.freestyleCommandInput.value.trim();
+        this.elements.executeCommandBtn.disabled = !command;
+    }
+    
+    /**
+     * Execute free-style natural language command
+     */
+    async executeFreestyleCommand() {
+        const command = this.elements.freestyleCommandInput.value.trim();
+        if (!command) return;
+        
+        this.elements.executeCommandBtn.disabled = true;
+        this.elements.executeCommandBtn.classList.add('executing');
+        this.elements.executeCommandBtn.textContent = 'Executing...';
+        
+        this.showCommandResult('loading', 'Executing command...');
+        this.logEvent('Command', `Executing: "${command}"`);
+        
+        try {
+            // Send command to MCP server
+            const response = await fetch('/api/execute-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    command: command
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.showCommandResult('success', result.result || result.message);
+                this.logEvent('Command', 'Command executed successfully');
+                
+                // Check if scene was updated and refresh if connected
+                if (this.isConnected && (result.actions_taken?.includes('created_scene') || 
+                    result.actions_taken?.includes('created_menagerie_scene'))) {
+                    this.sendEvent({
+                        type: 'refresh_scene'
+                    });
+                }
+            } else {
+                throw new Error(result.error || result.message || 'Command execution failed');
+            }
+            
+        } catch (error) {
+            this.showCommandResult('error', `Error: ${error.message}`);
+            this.logEvent('Error', `Command failed: ${error.message}`);
+        } finally {
+            this.elements.executeCommandBtn.disabled = false;
+            this.elements.executeCommandBtn.classList.remove('executing');
+            this.elements.executeCommandBtn.textContent = 'Execute Command';
+            this.handleFreestyleInputChange(); // Re-enable based on input content
+        }
+    }
+    
+    /**
+     * Show command execution result
+     */
+    showCommandResult(type, message) {
+        const resultElement = this.elements.commandResult;
+        resultElement.className = `command-result ${type}`;
+        resultElement.textContent = message;
+        resultElement.style.display = 'block';
+        
+        // Auto-hide after success (but keep errors/loading visible)
+        if (type === 'success') {
+            setTimeout(() => {
+                if (resultElement.classList.contains('success')) {
+                    resultElement.style.display = 'none';
+                }
+            }, 5000);
+        }
     }
 }
 

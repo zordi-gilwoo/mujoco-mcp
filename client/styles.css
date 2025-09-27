@@ -490,3 +490,162 @@ button:active {
 .xml-editor::-webkit-scrollbar-thumb:hover {
     background: #45a049;
 }
+
+/* Free-Style Command Interface */
+.command-input-container {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+}
+
+.command-textarea {
+    flex: 1;
+    min-height: 80px;
+    padding: 0.75rem;
+    background-color: #1a1a1a;
+    border: 1px solid #3d3d3d;
+    border-radius: 4px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 0.9rem;
+    line-height: 1.4;
+    resize: vertical;
+    transition: border-color 0.2s ease;
+}
+
+.command-textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+    background-color: #222;
+}
+
+.command-textarea::placeholder {
+    color: #888;
+    line-height: 1.4;
+}
+
+.execute-btn {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+    min-width: 120px;
+    height: fit-content;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.execute-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #45a049, #3d7c47);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(76, 175, 80, 0.4);
+}
+
+.execute-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.execute-btn:disabled {
+    background: #666;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.command-suggestions {
+    margin-top: 0.75rem;
+}
+
+.command-suggestions label {
+    font-size: 0.85rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.suggestion-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.suggestion-btn {
+    background-color: #3d3d3d;
+    color: #fff;
+    border: 1px solid #5d5d5d;
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.suggestion-btn:hover {
+    background-color: #4d4d4d;
+    border-color: #4CAF50;
+    color: #4CAF50;
+    transform: translateY(-1px);
+}
+
+.command-result {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    border-radius: 4px;
+    background-color: #2d2d2d;
+    border-left: 4px solid #4CAF50;
+    display: none;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.command-result.success {
+    border-left-color: #4CAF50;
+    background-color: rgba(76, 175, 80, 0.1);
+}
+
+.command-result.error {
+    border-left-color: #f44336;
+    background-color: rgba(244, 67, 54, 0.1);
+}
+
+.command-result.loading {
+    border-left-color: #ff9800;
+    background-color: rgba(255, 152, 0, 0.1);
+}
+
+/* Animation for command execution */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+}
+
+.execute-btn.executing {
+    animation: pulse 1s infinite;
+    background: #ff9800;
+}
+
+.execute-btn.executing:hover {
+    background: #ff9800;
+    transform: none;
+}
+
+/* Enhanced styling for scene tabs */
+.panel-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.panel-section h3:before {
+    content: "🎛️";
+    font-size: 0.9em;
+}

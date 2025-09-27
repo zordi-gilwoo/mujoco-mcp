@@ -177,8 +177,209 @@ async def handle_list_tools() -> List[types.Tool]:
                 "properties": {},
                 "required": []
             }
+        ),
+        types.Tool(
+            name="execute_command",
+            description="Execute natural language commands using available MCP tools",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "command": {
+                        "type": "string",
+                        "description": "Natural language command to execute"
+                    },
+                    "model_id": {
+                        "type": "string",
+                        "description": "Optional model ID to target specific model"
+                    }
+                },
+                "required": ["command"]
+            }
         )
     ]
+
+async def parse_and_execute_command(command: str, model_id: Optional[str] = None) -> str:
+    """Parse natural language command and execute corresponding MCP tools"""
+    
+    command_lower = command.lower().strip()
+    actions_taken = []
+    
+    try:
+        # Scene creation commands
+        if any(phrase in command_lower for phrase in ["create", "make", "build", "load"]):
+            if any(phrase in command_lower for phrase in ["pendulum", "simple pendulum"]):
+                result = await handle_create_scene("pendulum", model_id)
+                actions_taken.append("created_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            elif any(phrase in command_lower for phrase in ["double pendulum", "chaotic"]):
+                result = await handle_create_scene("double_pendulum", model_id)
+                actions_taken.append("created_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            elif any(phrase in command_lower for phrase in ["cart pole", "cart-pole", "cartpole", "balancing"]):
+                result = await handle_create_scene("cart_pole", model_id)
+                actions_taken.append("created_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            elif any(phrase in command_lower for phrase in ["arm", "robot arm", "robotic arm"]):
+                result = await handle_create_scene("arm", model_id)
+                actions_taken.append("created_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            # Menagerie model creation
+            elif any(phrase in command_lower for phrase in ["franka", "panda", "franka panda"]):
+                result = await handle_create_menagerie_scene("franka_emika_panda", model_id)
+                actions_taken.append("created_menagerie_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            elif any(phrase in command_lower for phrase in ["ur5", "ur5e", "universal robot"]):
+                result = await handle_create_menagerie_scene("universal_robots_ur5e", model_id)
+                actions_taken.append("created_menagerie_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+            elif any(phrase in command_lower for phrase in ["quadruped", "dog", "spot", "anymal"]):
+                result = await handle_create_menagerie_scene("anybotics_anymal_c", model_id)
+                actions_taken.append("created_menagerie_scene")
+                return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+                
+        # Simulation control commands
+        elif any(phrase in command_lower for phrase in ["step", "run", "simulate", "advance"]):
+            steps = 1
+            # Extract number of steps if mentioned
+            import re
+            numbers = re.findall(r'\d+', command)
+            if numbers:
+                steps = int(numbers[0])
+                
+            result = await handle_step_simulation(model_id, steps)
+            actions_taken.append("stepped_simulation")
+            return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+            
+        elif any(phrase in command_lower for phrase in ["reset", "restart", "initialize"]):
+            result = await handle_reset_simulation(model_id)
+            actions_taken.append("reset_simulation")
+            return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+            
+        elif any(phrase in command_lower for phrase in ["state", "status", "information", "info"]):
+            result = await handle_get_state(model_id)
+            actions_taken.append("get_state")
+            return f"✅ Current state retrieved\n📋 Actions taken: {actions_taken}"
+            
+        elif any(phrase in command_lower for phrase in ["close", "stop", "quit", "exit"]):
+            result = await handle_close_viewer(model_id)
+            actions_taken.append("close_viewer")
+            return f"✅ {result.text}\n📋 Actions taken: {actions_taken}"
+            
+        elif any(phrase in command_lower for phrase in ["list", "show", "available", "models"]):
+            if any(phrase in command_lower for phrase in ["menagerie", "robot", "models"]):
+                result = await handle_list_menagerie_models()
+                actions_taken.append("list_menagerie_models")
+                return f"✅ Listed available models\n📋 Actions taken: {actions_taken}"
+            else:
+                result = await handle_get_session_info()
+                actions_taken.append("get_session_info")
+                return f"✅ Session information retrieved\n📋 Actions taken: {actions_taken}"
+                
+        else:
+            return f"❌ Command not recognized: '{command}'\n\n🤖 Try commands like:\n" \
+                   f"• 'Create a pendulum simulation'\n" \
+                   f"• 'Load Franka Panda robot'\n" \
+                   f"• 'Step simulation 100 times'\n" \
+                   f"• 'Reset the simulation'\n" \
+                   f"• 'Show current state'\n" \
+                   f"• 'List available models'"
+                   
+    except Exception as e:
+        logger.exception(f"Error executing command: {command}")
+        return f"❌ Error executing command '{command}': {str(e)}"
+
+async def handle_create_scene(scene_type: str, model_id: Optional[str] = None) -> types.TextContent:
+    """Helper to create scene"""
+    arguments = {"scene_type": scene_type}
+    if model_id:
+        arguments["model_id"] = model_id
+    results = await handle_call_tool("create_scene", arguments)
+    return results[0]
+
+async def handle_create_menagerie_scene(model_name: str, model_id: Optional[str] = None) -> types.TextContent:
+    """Helper to create menagerie scene"""
+    arguments = {"model_name": model_name}
+    if model_id:
+        arguments["scene_name"] = model_id
+    results = await handle_call_tool("create_menagerie_scene", arguments)
+    return results[0]
+
+async def handle_step_simulation(model_id: Optional[str], steps: int = 1) -> types.TextContent:
+    """Helper to step simulation"""
+    arguments = {"steps": steps}
+    if model_id:
+        arguments["model_id"] = model_id
+    else:
+        # Use default model from session
+        session = session_manager.get_session()
+        if session and session.active_models:
+            arguments["model_id"] = list(session.active_models.keys())[0]
+        else:
+            return types.TextContent(type="text", text="❌ No active model found. Create a scene first.")
+    
+    results = await handle_call_tool("step_simulation", arguments)
+    return results[0]
+
+async def handle_reset_simulation(model_id: Optional[str]) -> types.TextContent:
+    """Helper to reset simulation"""
+    arguments = {}
+    if model_id:
+        arguments["model_id"] = model_id
+    else:
+        # Use default model from session
+        session = session_manager.get_session()
+        if session and session.active_models:
+            arguments["model_id"] = list(session.active_models.keys())[0]
+        else:
+            return types.TextContent(type="text", text="❌ No active model found. Create a scene first.")
+    
+    results = await handle_call_tool("reset_simulation", arguments)
+    return results[0]
+
+async def handle_get_state(model_id: Optional[str]) -> types.TextContent:
+    """Helper to get state"""
+    arguments = {}
+    if model_id:
+        arguments["model_id"] = model_id
+    else:
+        # Use default model from session
+        session = session_manager.get_session()
+        if session and session.active_models:
+            arguments["model_id"] = list(session.active_models.keys())[0]
+        else:
+            return types.TextContent(type="text", text="❌ No active model found. Create a scene first.")
+    
+    results = await handle_call_tool("get_state", arguments)
+    return results[0]
+
+async def handle_close_viewer(model_id: Optional[str]) -> types.TextContent:
+    """Helper to close viewer"""
+    arguments = {}
+    if model_id:
+        arguments["model_id"] = model_id
+    
+    results = await handle_call_tool("close_viewer", arguments)
+    return results[0]
+
+async def handle_list_menagerie_models(category: Optional[str] = None) -> types.TextContent:
+    """Helper to list menagerie models"""
+    arguments = {}
+    if category:
+        arguments["category"] = category
+    
+    results = await handle_call_tool("list_menagerie_models", arguments)
+    return results[0]
+
+async def handle_get_session_info() -> types.TextContent:
+    """Helper to get session info"""
+    results = await handle_call_tool("get_session_info", {})
+    return results[0]
 
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
@@ -579,6 +780,24 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     },
                     "all_sessions": session_stats
                 }, indent=2)
+            )]
+        
+        elif name == "execute_command":
+            command = arguments.get("command", "").strip()
+            model_id = arguments.get("model_id")
+            
+            if not command:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ Command is required"
+                )]
+            
+            # Parse natural language command and map to MCP tool calls
+            result = await parse_and_execute_command(command, model_id)
+            
+            return [types.TextContent(
+                type="text",
+                text=result
             )]
         
         else:
