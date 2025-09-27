@@ -83,18 +83,25 @@ class RemoteViewer {
             scenePresetDropdown: document.getElementById('scene-preset-dropdown'),
             generateSceneBtn: document.getElementById('generate-scene-btn'),
             loadSceneBtn: document.getElementById('load-scene-btn'),
-            toggleXmlBtn: document.getElementById('toggle-xml-editor'),
-            xmlEditorContainer: document.getElementById('xml-editor-container'),
-            xmlEditor: document.getElementById('xml-editor'),
-            xmlValidationStatus: document.getElementById('xml-validation-status'),
             
-            // Tab system
-            tabButtons: document.querySelectorAll('.tab-button'),
-            tabPanes: document.querySelectorAll('.tab-pane'),
-            xmlTab: document.getElementById('xml-tab'),
-            pythonTab: document.getElementById('python-tab'),
-            xmlTabEditor: document.getElementById('xml-editor'),
-            pythonEditor: document.getElementById('python-editor'),
+            // Scene XML editor
+            toggleSceneXmlBtn: document.getElementById('toggle-scene-xml-editor'),
+            sceneXmlEditorContainer: document.getElementById('scene-xml-editor-container'),
+            sceneXmlEditor: document.getElementById('scene-xml-editor'),
+            sceneXmlValidationStatus: document.getElementById('scene-xml-validation-status'),
+            
+            // RL Environment tab system
+            rlTabButtons: document.querySelectorAll('#rl-editor-container .tab-button'),
+            rlTabPanes: document.querySelectorAll('#rl-editor-container .tab-pane'),
+            rlXmlTab: document.getElementById('rl-xml-tab'),
+            rlPythonTab: document.getElementById('rl-python-tab'),
+            rlXmlEditor: document.getElementById('rl-xml-editor'),
+            rlPythonEditor: document.getElementById('rl-python-editor'),
+            
+            // RL Environment editor controls
+            toggleRlEditorBtn: document.getElementById('toggle-rl-editor'),
+            rlEditorContainer: document.getElementById('rl-editor-container'),
+            rlValidationStatus: document.getElementById('rl-validation-status'),
             
             // RL Environment controls
             rlPromptInput: document.getElementById('rl-prompt-input'),
@@ -145,12 +152,15 @@ class RemoteViewer {
         
         this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
         this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
-        this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
+        this.elements.toggleSceneXmlBtn.addEventListener('click', () => this.toggleSceneXmlEditor());
         
-        // Tab system
-        this.elements.tabButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+        // RL Environment tab system
+        this.elements.rlTabButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => this.switchRLTab(e.target.dataset.tab));
         });
+        
+        // RL Environment editor controls
+        this.elements.toggleRlEditorBtn.addEventListener('click', () => this.toggleRLEditor());
         
         // RL Environment controls
         this.elements.rlPresetDropdown.addEventListener('change', (e) => {
@@ -741,7 +751,7 @@ class RemoteViewer {
         
         this.elements.generateSceneBtn.disabled = true;
         this.elements.generateSceneBtn.textContent = 'Generating...';
-        this.setValidationStatus('checking', 'Generating scene XML...');
+        this.setSceneValidationStatus('checking', 'Generating scene XML...');
         
         try {
             // Map common prompts to scene types
@@ -769,25 +779,25 @@ class RemoteViewer {
             // Generate the XML based on scene type
             const xml = this.generateSceneXML(sceneType);
             
-            // Update the XML editor
-            this.elements.xmlEditor.value = xml;
+            // Update the Scene XML editor
+            this.elements.sceneXmlEditor.value = xml;
             this.currentSceneXML = xml;
             
             // Validate the XML
-            await this.validateXML(xml);
+            await this.validateSceneXML(xml);
             
             // Enable load button
             this.elements.loadSceneBtn.disabled = false;
             
-            // Show XML editor if collapsed
-            if (this.elements.xmlEditorContainer.classList.contains('collapsed')) {
-                this.toggleXmlEditor();
+            // Show Scene XML editor if collapsed
+            if (this.elements.sceneXmlEditorContainer.classList.contains('collapsed')) {
+                this.toggleSceneXmlEditor();
             }
             
             this.logEvent('Scene', `Generated ${sceneType} scene from prompt: "${prompt}"`);
             
         } catch (error) {
-            this.setValidationStatus('invalid', `Error: ${error.message}`);
+            this.setSceneValidationStatus('invalid', `Error: ${error.message}`);
             this.logEvent('Error', `Scene generation failed: ${error.message}`);
         } finally {
             this.elements.generateSceneBtn.disabled = false;
@@ -889,11 +899,11 @@ class RemoteViewer {
     }
     
     /**
-     * Toggle XML editor visibility
+     * Toggle Scene XML editor visibility
      */
-    toggleXmlEditor() {
-        const container = this.elements.xmlEditorContainer;
-        const btn = this.elements.toggleXmlBtn;
+    toggleSceneXmlEditor() {
+        const container = this.elements.sceneXmlEditorContainer;
+        const btn = this.elements.toggleSceneXmlBtn;
         
         if (container.classList.contains('collapsed')) {
             container.classList.remove('collapsed');
@@ -905,16 +915,32 @@ class RemoteViewer {
     }
     
     /**
-     * Switch between XML and Python tabs
+     * Toggle RL Editor visibility
      */
-    switchTab(tabName) {
+    toggleRLEditor() {
+        const container = this.elements.rlEditorContainer;
+        const btn = this.elements.toggleRlEditorBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide RL Code';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show RL Code';
+        }
+    }
+    
+    /**
+     * Switch between RL XML and Python tabs
+     */
+    switchRLTab(tabName) {
         // Update tab buttons
-        this.elements.tabButtons.forEach(btn => {
+        this.elements.rlTabButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
         
         // Update tab panes
-        this.elements.tabPanes.forEach(pane => {
+        this.elements.rlTabPanes.forEach(pane => {
             pane.classList.toggle('active', pane.id === `${tabName}-tab`);
         });
     }
@@ -951,6 +977,12 @@ class RemoteViewer {
         const prompt = this.elements.rlPromptInput.value.trim();
         if (!prompt) return;
         
+        // Check if we have a scene XML to base the RL environment on
+        if (!this.currentSceneXML) {
+            this.logEvent('Please generate a scene first before creating an RL environment', 'error');
+            return;
+        }
+        
         this.elements.generateRlEnvBtn.disabled = true;
         this.elements.generateRlEnvBtn.textContent = 'Generating...';
         
@@ -960,26 +992,25 @@ class RemoteViewer {
             // Parse the prompt to determine environment type
             const envConfig = this.parseRLPrompt(prompt);
             
-            // Generate the XML for the environment  
-            const xml = this.generateRLEnvironmentXML(envConfig);
-            this.currentSceneXML = xml;
-            this.elements.xmlTabEditor.value = xml;
+            // Generate the RL environment XML based on the scene XML
+            const rlXml = this.generateRLEnvironmentXML(envConfig, this.currentSceneXML);
+            this.elements.rlXmlEditor.value = rlXml;
             
             // Generate the Python gymnasium environment code
             const pythonCode = this.generateRLEnvironmentPython(envConfig);
-            this.elements.pythonEditor.value = pythonCode;
-            this.currentRLEnvironment = { config: envConfig, python: pythonCode };
+            this.elements.rlPythonEditor.value = pythonCode;
+            this.currentRLEnvironment = { config: envConfig, python: pythonCode, xml: rlXml };
             
             // Update UI
             this.elements.loadRlEnvBtn.disabled = false;
             this.elements.runRandomActionsBtn.disabled = false;
             
             // Switch to Python tab to show the generated code
-            this.switchTab('python');
+            this.switchRLTab('rl-python');
             
-            // Show the XML editor if not already visible
-            if (this.elements.xmlEditorContainer.classList.contains('collapsed')) {
-                this.toggleXmlEditor();
+            // Show the RL editor if not already visible
+            if (this.elements.rlEditorContainer.classList.contains('collapsed')) {
+                this.toggleRLEditor();
             }
             
             this.logEvent(`RL environment generated: ${envConfig.task_type} with ${envConfig.robot_type}`, 'success');
@@ -1026,9 +1057,40 @@ class RemoteViewer {
     }
     
     /**
-     * Generate XML for RL environment
+     * Generate XML for RL environment based on scene XML
      */
-    generateRLEnvironmentXML(config) {
+    generateRLEnvironmentXML(config, baseSceneXML) {
+        // If we have a base scene XML, modify it for RL
+        if (baseSceneXML) {
+            // Add RL-specific elements to the base scene
+            let rlXml = baseSceneXML;
+            
+            // Add targets for reaching tasks
+            if (config.task_type === 'reaching') {
+                // Look for closing </worldbody> tag and add target before it
+                if (rlXml.includes('</worldbody>')) {
+                    const targetXml = `
+        <!-- RL Target -->
+        <body name="target" pos="0.5 0.0 0.5">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>`;
+                    rlXml = rlXml.replace('</worldbody>', targetXml + '\n    </worldbody>');
+                }
+            }
+            
+            // Add actuators section for control
+            if (!rlXml.includes('<actuator>')) {
+                const actuatorXml = `
+    <actuator>
+        <!-- RL Actuators will be dynamically added based on joints -->
+    </actuator>`;
+                rlXml = rlXml.replace('</mujoco>', actuatorXml + '\n</mujoco>');
+            }
+            
+            return rlXml;
+        }
+        
+        // Fallback to predefined templates if no base scene
         const xmlTemplates = {
             franka_reaching: `<mujoco model="franka_reaching">
     <option timestep="0.002"/>
@@ -1199,15 +1261,22 @@ if __name__ == "__main__":
      * Load RL environment to viewer
      */
     async loadRLEnvironment() {
-        if (!this.currentRLEnvironment) return;
+        if (!this.currentRLEnvironment || !this.currentRLEnvironment.xml) return;
         
         this.elements.loadRlEnvBtn.disabled = true;
         this.elements.loadRlEnvBtn.textContent = 'Loading...';
         
         try {
-            // Load the XML to the viewer
-            await this.loadScene();
-            this.logEvent('RL environment loaded to viewer', 'success');
+            // Load the RL XML to the viewer
+            const success = await this.sendCommand('load_model', {
+                model_xml: this.currentRLEnvironment.xml
+            });
+            
+            if (success) {
+                this.logEvent('RL environment loaded to viewer', 'success');
+            } else {
+                throw new Error('Failed to load RL environment to viewer');
+            }
         } catch (error) {
             this.logEvent(`Failed to load RL environment: ${error.message}`, 'error');
         } finally {
@@ -1233,7 +1302,7 @@ if __name__ == "__main__":
             // Send command to backend to start RL environment
             const result = await this.sendRLCommand('start_random_actions', {
                 config: this.currentRLEnvironment.config,
-                xml: this.currentSceneXML
+                xml: this.currentRLEnvironment.xml
             });
             
             if (result.success) {
@@ -1307,7 +1376,54 @@ if __name__ == "__main__":
     }
     
     /**
-     * Validate XML content
+     * Validate Scene XML content
+     */
+    async validateSceneXML(xml) {
+        try {
+            // Basic XML structure validation
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            
+            // Check for parsing errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                throw new Error('Invalid XML structure');
+            }
+            
+            // Check if it's a MuJoCo XML (has mujoco root element)
+            const mujocoRoot = doc.querySelector('mujoco');
+            if (!mujocoRoot) {
+                throw new Error('Not a valid MuJoCo XML (missing <mujoco> root element)');
+            }
+            
+            // Check for required worldbody
+            const worldbody = doc.querySelector('worldbody');
+            if (!worldbody) {
+                throw new Error('Missing <worldbody> element');
+            }
+            
+            this.setSceneValidationStatus('valid', 'Valid MuJoCo XML');
+            return true;
+            
+        } catch (error) {
+            this.setSceneValidationStatus('invalid', error.message);
+            return false;
+        }
+    }
+    
+    /**
+     * Set scene validation status
+     */
+    setSceneValidationStatus(type, message) {
+        const status = this.elements.sceneXmlValidationStatus;
+        if (status) {
+            status.className = `validation-status ${type}`;
+            status.textContent = message;
+        }
+    }
+    
+    /**
+     * Validate XML content (legacy method for compatibility)
      */
     async validateXML(xml) {
         try {
