@@ -295,18 +295,77 @@ The system uses a JSON-based event protocol for all interactions:
 4. Add performance metrics and monitoring
 5. Hardware acceleration support
 
-### 🚀 **Phase 3: Advanced Features**
-1. Multi-client support with session management
-2. Authentication and authorization
-3. Advanced camera controls and modes
-4. Scene loading and model switching
-5. Physics debugging visualization
+### 🌐 **Phase 3: Multi-Client Architecture (INTEGRATED)**
+1. ✅ Multi-client support with concurrent WebRTC connections
+2. ✅ Session isolation and connection management
+3. ✅ Real-time collaboration with shared simulation state
+4. ✅ Automatic client cleanup and resource management
+5. ✅ Integration path with main MCP server's session architecture
 
-### 🏭 **Phase 4: Production Deployment**
+### 🚀 **Phase 4: Advanced Features**
+1. Authentication and authorization
+2. Advanced camera controls and modes
+3. Physics debugging visualization
+4. Cross-session collaboration features
+
+### 🏭 **Phase 5: Production Deployment**
 1. Docker containerization
 2. Kubernetes deployment configs
 3. Load balancing and scaling
 4. Monitoring and alerting
+
+## 🌐 Multi-Client Architecture
+
+The WebRTC viewer includes robust built-in multi-client support for concurrent users:
+
+### Multi-Client Features
+- **✅ Concurrent Connections**: Multiple browsers can connect simultaneously to the same server
+- **✅ Real-time Collaboration**: Multiple users can observe the same MuJoCo simulation
+- **✅ Independent Event Handling**: Mouse/keyboard events from all clients are processed
+- **✅ Shared Simulation State**: All clients see the same physics simulation and scene updates  
+- **✅ Connection Management**: Automatic tracking and cleanup of client connections
+- **✅ Live Statistics**: Monitor connected clients and usage metrics via `/api/stats`
+
+### Architecture Integration
+The WebRTC viewer complements the main MuJoCo MCP server's multi-client architecture:
+
+| Component | Multi-Client Support |
+|-----------|---------------------|
+| **Main MCP Server** | Session isolation with dedicated viewer ports per MCP client |
+| **WebRTC Viewer** | Multiple browser connections per server instance |
+| **Combined Architecture** | Each MCP session can support multiple WebRTC viewers |
+
+### Usage Examples
+```bash
+# Start WebRTC viewer server
+./scripts/run_py_viewer.sh
+
+# Multiple clients can connect simultaneously:
+# • Client 1: Chrome at http://localhost:8000/
+# • Client 2: Firefox at http://localhost:8000/
+# • Client 3: Mobile Safari at http://localhost:8000/
+# All clients see the same real-time MuJoCo simulation
+```
+
+### Scene Broadcasting
+When scenes are updated via the API, all connected WebRTC clients receive updates:
+```bash
+# Load new scene - broadcasts to all connected clients
+curl -X POST "http://localhost:8000/api/scene/load" \
+  -H "Content-Type: application/json" \
+  -d '{"xml": "<mujoco>...</mujoco>"}'
+```
+
+### Client Statistics
+Monitor multi-client usage via the stats API:
+```json
+{
+  "clients_connected": 3,
+  "total_connections": 12,
+  "events_received": 847,
+  "frames_sent": 1250
+}
+```
 
 ## 📊 Performance Metrics
 
@@ -346,9 +405,14 @@ The server provides several REST API endpoints:
     "message": "Scene loaded successfully"
   }
   ```
+  **Multi-Client Behavior**: Scene updates are automatically broadcast to all connected WebRTC clients
 
 ### WebSocket Endpoints
-- **`WS /ws/signaling`** - WebRTC signaling and event handling
+- **`WS /ws/signaling`** - WebRTC signaling and multi-client event handling
+  - **WebRTC Negotiation**: Handles offer/answer and ICE candidates for each client
+  - **Event Processing**: Routes input events from browsers to MuJoCo simulation
+  - **Scene Broadcasting**: Distributes scene updates to all connected clients
+  - **Connection Management**: Tracks client connections and handles cleanup
 
 ## 🐛 Troubleshooting
 
