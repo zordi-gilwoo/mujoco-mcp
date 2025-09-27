@@ -298,7 +298,7 @@ async def handle_list_tools() -> List[types.Tool]:
                     "height": {"type": "integer", "description": "Video height", "default": 480},
                     "fps": {"type": "integer", "description": "Frames per second", "default": 30},
                     "bitrate": {"type": "string", "description": "Bitrate (e.g. '2M')", "default": "2M"},
-                    "streaming": {"type": "boolean", "description": "Enable streaming mode", "default": false}
+                    "streaming": {"type": "boolean", "description": "Enable streaming mode", "default": False}
                 },
                 "required": ["model_id"],
             },
@@ -312,7 +312,7 @@ async def handle_list_tools() -> List[types.Tool]:
                     "model_id": {"type": "string", "description": "ID of the model"},
                     "duration": {"type": "number", "description": "Recording duration in seconds", "default": 5.0},
                     "camera_id": {"type": "integer", "description": "Camera ID", "default": -1},
-                    "return_bytes": {"type": "boolean", "description": "Return video as base64 bytes", "default": true}
+                    "return_bytes": {"type": "boolean", "description": "Return video as base64 bytes", "default": True}
                 },
                 "required": ["model_id"],
             },
@@ -633,8 +633,10 @@ async def handle_call_tool(
                                 "text": f"H.264 video recording from {model_id} ({duration}s)"
                             }
                         )]
+                    elif video_data:
+                        result = f"✅ Video recorded for '{model_id}' ({duration}s, {total_frames} frames, {len(video_data)} bytes)"
                     else:
-                        result = f"✅ Video recorded for '{model_id}' ({duration}s, {total_frames} frames)"
+                        result = f"⚠️ Video recording completed but no data generated (frames: {total_frames})"
                         
                 except Exception as e:
                     result = f"❌ Video recording failed: {str(e)}"
