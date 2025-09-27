@@ -69,6 +69,26 @@ dev = [
     "rich>=13.0.0",
 ]
 
+gpu = [
+    # EGL rendering support
+    "PyOpenGL>=3.1.0",
+    "PyOpenGL-accelerate>=3.1.0",
+]
+
+video = [
+    # H.264 encoding support
+    "pillow>=8.0.0",
+    "ffmpeg-python>=0.2.0",
+]
+
+full = [
+    # All optional features
+    "PyOpenGL>=3.1.0",
+    "PyOpenGL-accelerate>=3.1.0", 
+    "pillow>=8.0.0",
+    "ffmpeg-python>=0.2.0",
+]
+
 test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",

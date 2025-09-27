@@ -18,6 +18,8 @@ class RemoteViewer {
         
         // Scene creation state
         this.currentSceneXML = null;
+        this.currentRLEnvironment = null;
+        this.isRLRunning = false;
         
         // Mouse interaction state
         this.mouseState = {
@@ -97,6 +99,35 @@ class RemoteViewer {
             rlValidationStatus: document.getElementById('rl-validation-status'),
             saveRlBtn: document.getElementById('save-rl-btn'),
             runRlBtn: document.getElementById('run-rl-btn'),
+            // Scene creation controls
+            scenePromptInput: document.getElementById('scene-prompt-input'),
+            scenePresetDropdown: document.getElementById('scene-preset-dropdown'),
+            generateSceneBtn: document.getElementById('generate-scene-btn'),
+            loadSceneBtn: document.getElementById('load-scene-btn'),
+            
+            
+            // RL Environment tab system
+            rlTabButtons: document.querySelectorAll('#rl-editor-container .tab-button'),
+            rlTabPanes: document.querySelectorAll('#rl-editor-container .tab-pane'),
+            rlXmlTab: document.getElementById('rl-xml-tab'),
+            rlPythonTab: document.getElementById('rl-python-tab'),
+            rlXmlEditor: document.getElementById('rl-xml-editor'),
+            rlPythonEditor: document.getElementById('rl-python-editor'),
+            
+            // RL Environment editor controls
+            toggleRlEditorBtn: document.getElementById('toggle-rl-editor'),
+            rlEditorContainer: document.getElementById('rl-editor-container'),
+            rlValidationStatus: document.getElementById('rl-validation-status'),
+            
+            // RL Environment controls
+            rlPromptInput: document.getElementById('rl-prompt-input'),
+            rlPresetDropdown: document.getElementById('rl-preset-dropdown'),
+            generateRlEnvBtn: document.getElementById('generate-rl-env-btn'),
+            loadRlEnvBtn: document.getElementById('load-rl-env-btn'),
+            runRandomActionsBtn: document.getElementById('run-random-actions-btn'),
+            stopRlEnvBtn: document.getElementById('stop-rl-env-btn'),
+            toggleGuidelinesBtn: document.getElementById('toggle-guidelines'),
+            guidelinesContainer: document.getElementById('guidelines-container'),
             
             // Camera presets
             presetBtns: document.querySelectorAll('.preset-btn'),
@@ -123,6 +154,7 @@ class RemoteViewer {
         this.elements.pauseSimBtn.addEventListener('click', () => this.sendCommand('pause'));
         this.elements.resetSimBtn.addEventListener('click', () => this.sendCommand('reset'));
         
+
         // Editor controls
         this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
         this.elements.toggleRlBtn.addEventListener('click', () => this.toggleRlEditor());
@@ -133,7 +165,47 @@ class RemoteViewer {
         
         // Editor content change listeners
         this.elements.xmlEditor.addEventListener('input', () => this.handleXmlEditorChange());
-        this.elements.rlEditor.addEventListener('input', () => this.handleRlEditorChange());
+        this.elements.rlEditor.addEventListener('input', () => this.handleRlEditorChange())
+        // Scene creation controls
+        this.elements.scenePresetDropdown.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.elements.scenePromptInput.value = e.target.value;
+                this.handlePromptChange();
+            }
+        });
+        
+        this.elements.scenePromptInput.addEventListener('input', () => {
+            this.handlePromptChange();
+        });
+        
+        this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
+        this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
+        this.elements.toggleSceneXmlBtn.addEventListener('click', () => this.toggleSceneXmlEditor());
+        
+        // RL Environment tab system
+        this.elements.rlTabButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => this.switchRLTab(e.target.dataset.tab));
+        });
+        
+        // RL Environment editor controls
+        this.elements.toggleRlEditorBtn.addEventListener('click', () => this.toggleRLEditor());
+        
+        // RL Environment controls
+        this.elements.rlPresetDropdown.addEventListener('change', (e) => {
+            if (e.target.value) {
+                this.handleRLPresetChange(e.target.value);
+            }
+        });
+        
+        this.elements.rlPromptInput.addEventListener('input', () => {
+            this.handleRLPromptChange();
+        });
+        
+        this.elements.generateRlEnvBtn.addEventListener('click', () => this.generateRLEnvironment());
+        this.elements.loadRlEnvBtn.addEventListener('click', () => this.loadRLEnvironment());
+        this.elements.runRandomActionsBtn.addEventListener('click', () => this.runRandomActions());
+        this.elements.stopRlEnvBtn.addEventListener('click', () => this.stopRLEnvironment());
+        this.elements.toggleGuidelinesBtn.addEventListener('click', () => this.toggleGuidelines());
         
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
@@ -733,7 +805,7 @@ class RemoteViewer {
         
         this.elements.generateSceneBtn.disabled = true;
         this.elements.generateSceneBtn.textContent = 'Generating...';
-        this.setValidationStatus('checking', 'Generating scene XML...');
+        this.setSceneValidationStatus('checking', 'Generating scene XML...');
         
         try {
             // Map common prompts to scene types
@@ -761,25 +833,25 @@ class RemoteViewer {
             // Generate the XML based on scene type
             const xml = this.generateSceneXML(sceneType);
             
-            // Update the XML editor
-            this.elements.xmlEditor.value = xml;
+            // Update the Scene XML editor
+            this.elements.sceneXmlEditor.value = xml;
             this.currentSceneXML = xml;
             
             // Validate the XML
-            await this.validateXML(xml);
+            await this.validateSceneXML(xml);
             
             // Enable load button
             this.elements.loadSceneBtn.disabled = false;
             
-            // Show XML editor if collapsed
-            if (this.elements.xmlEditorContainer.classList.contains('collapsed')) {
-                this.toggleXmlEditor();
+            // Show Scene XML editor if collapsed
+            if (this.elements.sceneXmlEditorContainer.classList.contains('collapsed')) {
+                this.toggleSceneXmlEditor();
             }
             
             this.logEvent('Scene', `Generated ${sceneType} scene from prompt: "${prompt}"`);
             
         } catch (error) {
-            this.setValidationStatus('invalid', `Error: ${error.message}`);
+            this.setSceneValidationStatus('invalid', `Error: ${error.message}`);
             this.logEvent('Error', `Scene generation failed: ${error.message}`);
         } finally {
             this.elements.generateSceneBtn.disabled = false;
@@ -881,11 +953,11 @@ class RemoteViewer {
     }
     
     /**
-     * Toggle XML editor visibility
+     * Toggle Scene XML editor visibility
      */
-    toggleXmlEditor() {
-        const container = this.elements.xmlEditorContainer;
-        const btn = this.elements.toggleXmlBtn;
+    toggleSceneXmlEditor() {
+        const container = this.elements.sceneXmlEditorContainer;
+        const btn = this.elements.toggleSceneXmlBtn;
         
         if (container.classList.contains('collapsed')) {
             container.classList.remove('collapsed');
@@ -897,7 +969,515 @@ class RemoteViewer {
     }
     
     /**
-     * Validate XML content
+     * Toggle RL Editor visibility
+     */
+    toggleRLEditor() {
+        const container = this.elements.rlEditorContainer;
+        const btn = this.elements.toggleRlEditorBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide RL Code';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show RL Code';
+        }
+    }
+    
+    /**
+     * Switch between RL XML and Python tabs
+     */
+    switchRLTab(tabName) {
+        // Update tab buttons
+        this.elements.rlTabButtons.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+        
+        // Update tab panes
+        this.elements.rlTabPanes.forEach(pane => {
+            pane.classList.toggle('active', pane.id === `${tabName}-tab`);
+        });
+    }
+    
+    /**
+     * Handle RL preset dropdown change
+     */
+    handleRLPresetChange(presetValue) {
+        const presetPrompts = {
+            'franka_reaching': 'Create a reaching task for Franka Panda to reach random targets with continuous actions',
+            'cart_pole_balancing': 'Design a cart-pole balancing environment with discrete actions',
+            'quadruped_walking': 'Build a quadruped walking environment with gait rewards',
+            'simple_arm_reaching': 'Create a simple 2-DOF arm reaching task with sparse rewards'
+        };
+        
+        if (presetPrompts[presetValue]) {
+            this.elements.rlPromptInput.value = presetPrompts[presetValue];
+            this.handleRLPromptChange();
+        }
+    }
+    
+    /**
+     * Handle RL prompt input change
+     */
+    handleRLPromptChange() {
+        const prompt = this.elements.rlPromptInput.value.trim();
+        this.elements.generateRlEnvBtn.disabled = !prompt;
+    }
+    
+    /**
+     * Generate RL environment from prompt
+     */
+    async generateRLEnvironment() {
+        const prompt = this.elements.rlPromptInput.value.trim();
+        if (!prompt) return;
+        
+        // Check if we have a scene XML to base the RL environment on
+        if (!this.currentSceneXML) {
+            this.logEvent('Please generate a scene first before creating an RL environment', 'error');
+            return;
+        }
+        
+        this.elements.generateRlEnvBtn.disabled = true;
+        this.elements.generateRlEnvBtn.textContent = 'Generating...';
+        
+        try {
+            this.logEvent('Generating RL environment...', 'info');
+            
+            // Parse the prompt to determine environment type
+            const envConfig = this.parseRLPrompt(prompt);
+            
+            // Generate the RL environment XML based on the scene XML
+            const rlXml = this.generateRLEnvironmentXML(envConfig, this.currentSceneXML);
+            this.elements.rlXmlEditor.value = rlXml;
+            
+            // Generate the Python gymnasium environment code
+            const pythonCode = this.generateRLEnvironmentPython(envConfig);
+            this.elements.rlPythonEditor.value = pythonCode;
+            this.currentRLEnvironment = { config: envConfig, python: pythonCode, xml: rlXml };
+            
+            // Update UI
+            this.elements.loadRlEnvBtn.disabled = false;
+            this.elements.runRandomActionsBtn.disabled = false;
+            
+            // Switch to Python tab to show the generated code
+            this.switchRLTab('rl-python');
+            
+            // Show the RL editor if not already visible
+            if (this.elements.rlEditorContainer.classList.contains('collapsed')) {
+                this.toggleRLEditor();
+            }
+            
+            this.logEvent(`RL environment generated: ${envConfig.task_type} with ${envConfig.robot_type}`, 'success');
+            
+        } catch (error) {
+            this.logEvent(`Failed to generate RL environment: ${error.message}`, 'error');
+        } finally {
+            this.elements.generateRlEnvBtn.disabled = false;
+            this.elements.generateRlEnvBtn.textContent = 'Generate RL Env';
+        }
+    }
+    
+    /**
+     * Parse RL prompt to extract environment configuration
+     */
+    parseRLPrompt(prompt) {
+        const config = {
+            task_type: 'reaching',
+            robot_type: 'simple_arm',
+            action_space_type: 'continuous',
+            max_episode_steps: 1000,
+            reward_scale: 1.0
+        };
+        
+        const promptLower = prompt.toLowerCase();
+        
+        // Detect task type
+        if (promptLower.includes('reach')) config.task_type = 'reaching';
+        else if (promptLower.includes('balanc')) config.task_type = 'balancing';
+        else if (promptLower.includes('walk')) config.task_type = 'walking';
+        else if (promptLower.includes('manipulat')) config.task_type = 'manipulation';
+        
+        // Detect robot type
+        if (promptLower.includes('franka') || promptLower.includes('panda')) config.robot_type = 'franka_panda';
+        else if (promptLower.includes('cart') && promptLower.includes('pole')) config.robot_type = 'cart_pole';
+        else if (promptLower.includes('quadruped')) config.robot_type = 'quadruped';
+        else if (promptLower.includes('simple') && promptLower.includes('arm')) config.robot_type = 'simple_arm';
+        
+        // Detect action space type
+        if (promptLower.includes('discrete')) config.action_space_type = 'discrete';
+        else if (promptLower.includes('continuous')) config.action_space_type = 'continuous';
+        
+        return config;
+    }
+    
+    /**
+     * Generate XML for RL environment based on scene XML
+     */
+    generateRLEnvironmentXML(config, baseSceneXML) {
+        // If we have a base scene XML, modify it for RL
+        if (baseSceneXML) {
+            // Add RL-specific elements to the base scene
+            let rlXml = baseSceneXML;
+            
+            // Add targets for reaching tasks
+            if (config.task_type === 'reaching') {
+                // Look for closing </worldbody> tag and add target before it
+                if (rlXml.includes('</worldbody>')) {
+                    const targetXml = `
+        <!-- RL Target -->
+        <body name="target" pos="0.5 0.0 0.5">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>`;
+                    rlXml = rlXml.replace('</worldbody>', targetXml + '\n    </worldbody>');
+                }
+            }
+            
+            // Add actuators section for control
+            if (!rlXml.includes('<actuator>')) {
+                const actuatorXml = `
+    <actuator>
+        <!-- RL Actuators will be dynamically added based on joints -->
+    </actuator>`;
+                rlXml = rlXml.replace('</mujoco>', actuatorXml + '\n</mujoco>');
+            }
+            
+            return rlXml;
+        }
+        
+        // Fallback to predefined templates if no base scene
+        const xmlTemplates = {
+            franka_reaching: `<mujoco model="franka_reaching">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="base" pos="0 0 0">
+            <geom name="base_geom" type="cylinder" size="0.1 0.1" rgba="0.5 0.5 0.5 1"/>
+            <body name="link1" pos="0 0 0.1">
+                <joint name="joint1" type="hinge" axis="0 0 1"/>
+                <geom name="link1_geom" type="capsule" size="0.05 0.2" rgba="0.8 0.2 0.2 1"/>
+                <body name="link2" pos="0 0 0.2">
+                    <joint name="joint2" type="hinge" axis="0 1 0"/>
+                    <geom name="link2_geom" type="capsule" size="0.04 0.15" rgba="0.2 0.8 0.2 1"/>
+                    <body name="end_effector" pos="0 0 0.15">
+                        <geom name="ee_geom" type="sphere" size="0.03" rgba="1 0 0 1"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="target" pos="0.5 0.0 0.5">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>
+    </worldbody>
+</mujoco>`,
+            cart_pole: `<mujoco model="cartpole">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="cart" pos="0 0 0.1">
+            <joint name="slider" type="slide" axis="1 0 0" range="-2 2"/>
+            <geom name="cart_geom" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole" pos="0 0 0.1">
+                <joint name="hinge" type="hinge" axis="0 1 0" range="-1.57 1.57"/>
+                <geom name="pole_geom" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            quadruped: `<mujoco model="quadruped">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="torso" pos="0 0 0.3">
+            <geom name="torso_geom" type="box" size="0.2 0.1 0.05" rgba="0.8 0.2 0.2 1"/>
+            <body name="leg1" pos="0.15 0.08 -0.05">
+                <joint name="hip1" type="hinge" axis="0 1 0"/>
+                <geom name="leg1_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg2" pos="0.15 -0.08 -0.05">
+                <joint name="hip2" type="hinge" axis="0 1 0"/>
+                <geom name="leg2_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg3" pos="-0.15 0.08 -0.05">
+                <joint name="hip3" type="hinge" axis="0 1 0"/>
+                <geom name="leg3_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+            <body name="leg4" pos="-0.15 -0.08 -0.05">
+                <joint name="hip4" type="hinge" axis="0 1 0"/>
+                <geom name="leg4_geom" type="capsule" size="0.02 0.1" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>`,
+            simple_arm: `<mujoco model="simple_arm">
+    <option timestep="0.002"/>
+    <worldbody>
+        <body name="base" pos="0 0 0">
+            <geom name="base_geom" type="cylinder" size="0.1 0.1" rgba="0.5 0.5 0.5 1"/>
+            <body name="link1" pos="0 0 0.1">
+                <joint name="joint1" type="hinge" axis="0 0 1"/>
+                <geom name="link1_geom" type="capsule" size="0.05 0.2" rgba="0.8 0.2 0.2 1"/>
+                <body name="link2" pos="0 0 0.2">
+                    <joint name="joint2" type="hinge" axis="0 1 0"/>
+                    <geom name="link2_geom" type="capsule" size="0.04 0.15" rgba="0.2 0.8 0.2 1"/>
+                    <body name="end_effector" pos="0 0 0.15">
+                        <geom name="ee_geom" type="sphere" size="0.03" rgba="1 0 0 1"/>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="target" pos="0.3 0.0 0.3">
+            <geom name="target_geom" type="sphere" size="0.05" rgba="0 1 0 0.7"/>
+        </body>
+    </worldbody>
+</mujoco>`
+        };
+        
+        if (config.robot_type === 'franka_panda') return xmlTemplates.franka_reaching;
+        if (config.robot_type === 'cart_pole') return xmlTemplates.cart_pole;
+        if (config.robot_type === 'quadruped') return xmlTemplates.quadruped;
+        return xmlTemplates.simple_arm;
+    }
+    
+    /**
+     * Generate Python gymnasium environment code
+     */
+    generateRLEnvironmentPython(config) {
+        return `#!/usr/bin/env python3
+"""
+Auto-generated RL Environment for ${config.task_type} task with ${config.robot_type}
+Generated by MuJoCo MCP Remote Viewer
+"""
+
+import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
+import time
+from mujoco_mcp.rl_integration import MuJoCoRLEnvironment, RLConfig
+
+def create_environment():
+    """Create and return the RL environment"""
+    config = RLConfig(
+        robot_type="${config.robot_type}",
+        task_type="${config.task_type}",
+        max_episode_steps=${config.max_episode_steps},
+        action_space_type="${config.action_space_type}",
+        reward_scale=${config.reward_scale}
+    )
+    return MuJoCoRLEnvironment(config)
+
+def run_random_actions(env, num_steps=1000):
+    """Run the environment with random actions"""
+    print(f"🤖 Running ${config.task_type} task with random actions...")
+    print(f"📊 Environment: ${config.robot_type}")
+    print(f"🎮 Action space: ${config.action_space_type}")
+    print("=" * 50)
+    
+    obs, info = env.reset()
+    total_reward = 0
+    
+    for step in range(num_steps):
+        # Sample random action
+        action = env.action_space.sample()
+        
+        # Execute action
+        obs, reward, terminated, truncated, info = env.step(action)
+        total_reward += reward
+        
+        # Print progress every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step:4d}: reward={reward:.3f}, total={total_reward:.3f}")
+        
+        # Reset if episode ends
+        if terminated or truncated:
+            print(f"Episode finished at step {step}")
+            obs, info = env.reset()
+            total_reward = 0
+        
+        # Small delay for visualization
+        time.sleep(0.01)
+    
+    print(f"✅ Completed {num_steps} steps")
+
+if __name__ == "__main__":
+    # Create environment
+    env = create_environment()
+    
+    print(f"Environment created successfully!")
+    print(f"Observation space: {env.observation_space}")
+    print(f"Action space: {env.action_space}")
+    
+    try:
+        # Run with random actions
+        run_random_actions(env, num_steps=1000)
+    finally:
+        env.close()
+`;
+    }
+    
+    /**
+     * Load RL environment to viewer
+     */
+    async loadRLEnvironment() {
+        if (!this.currentRLEnvironment || !this.currentRLEnvironment.xml) return;
+        
+        this.elements.loadRlEnvBtn.disabled = true;
+        this.elements.loadRlEnvBtn.textContent = 'Loading...';
+        
+        try {
+            // Load the RL XML to the viewer
+            const success = await this.sendCommand('load_model', {
+                model_xml: this.currentRLEnvironment.xml
+            });
+            
+            if (success) {
+                this.logEvent('RL environment loaded to viewer', 'success');
+            } else {
+                throw new Error('Failed to load RL environment to viewer');
+            }
+        } catch (error) {
+            this.logEvent(`Failed to load RL environment: ${error.message}`, 'error');
+        } finally {
+            this.elements.loadRlEnvBtn.disabled = false;
+            this.elements.loadRlEnvBtn.textContent = 'Load RL Env';
+        }
+    }
+    
+    /**
+     * Run RL environment with random actions
+     */
+    async runRandomActions() {
+        if (!this.currentRLEnvironment || this.isRLRunning) return;
+        
+        this.isRLRunning = true;
+        this.elements.runRandomActionsBtn.disabled = true;
+        this.elements.stopRlEnvBtn.disabled = false;
+        this.elements.runRandomActionsBtn.textContent = '⏳ Running...';
+        
+        try {
+            this.logEvent('Starting RL environment with random actions...', 'info');
+            
+            // Send command to backend to start RL environment
+            const result = await this.sendRLCommand('start_random_actions', {
+                config: this.currentRLEnvironment.config,
+                xml: this.currentRLEnvironment.xml
+            });
+            
+            if (result.success) {
+                this.logEvent('RL environment running with random actions', 'success');
+                this.startRLMonitoring();
+            } else {
+                throw new Error(result.error || 'Failed to start RL environment');
+            }
+            
+        } catch (error) {
+            this.logEvent(`Failed to run RL environment: ${error.message}`, 'error');
+            this.stopRLEnvironment();
+        }
+    }
+    
+    /**
+     * Stop RL environment
+     */
+    async stopRLEnvironment() {
+        if (!this.isRLRunning) return;
+        
+        try {
+            await this.sendRLCommand('stop_rl_environment');
+            this.logEvent('RL environment stopped', 'info');
+        } catch (error) {
+            this.logEvent(`Error stopping RL environment: ${error.message}`, 'error');
+        }
+        
+        this.isRLRunning = false;
+        this.elements.runRandomActionsBtn.disabled = false;
+        this.elements.stopRlEnvBtn.disabled = true;
+        this.elements.runRandomActionsBtn.textContent = '▶ Run Random Actions';
+    }
+    
+    /**
+     * Start monitoring RL environment performance
+     */
+    startRLMonitoring() {
+        // This would periodically check RL environment status
+        // For now, just update the UI to show it's running
+        this.logEvent('RL monitoring started', 'info');
+    }
+    
+    /**
+     * Send RL-specific command to backend
+     */
+    async sendRLCommand(command, data = {}) {
+        // This would send commands to a backend RL service
+        // For now, simulate the command
+        return new Promise((resolve) => {
+            setTimeout(() => {
+                resolve({ success: true, data: {} });
+            }, 1000);
+        });
+    }
+    
+    /**
+     * Toggle guidelines visibility
+     */
+    toggleGuidelines() {
+        const container = this.elements.guidelinesContainer;
+        const btn = this.elements.toggleGuidelinesBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide Guidelines';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show Guidelines';
+        }
+    }
+    
+    /**
+     * Validate Scene XML content
+     */
+    async validateSceneXML(xml) {
+        try {
+            // Basic XML structure validation
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(xml, 'text/xml');
+            
+            // Check for parsing errors
+            const parseError = doc.querySelector('parsererror');
+            if (parseError) {
+                throw new Error('Invalid XML structure');
+            }
+            
+            // Check if it's a MuJoCo XML (has mujoco root element)
+            const mujocoRoot = doc.querySelector('mujoco');
+            if (!mujocoRoot) {
+                throw new Error('Not a valid MuJoCo XML (missing <mujoco> root element)');
+            }
+            
+            // Check for required worldbody
+            const worldbody = doc.querySelector('worldbody');
+            if (!worldbody) {
+                throw new Error('Missing <worldbody> element');
+            }
+            
+            this.setSceneValidationStatus('valid', 'Valid MuJoCo XML');
+            return true;
+            
+        } catch (error) {
+            this.setSceneValidationStatus('invalid', error.message);
+            return false;
+        }
+    }
+    
+    /**
+     * Set scene validation status
+     */
+    setSceneValidationStatus(type, message) {
+        const status = this.elements.sceneXmlValidationStatus;
+        if (status) {
+            status.className = `validation-status ${type}`;
+            status.textContent = message;
+        }
+    }
+    
+    /**
+     * Validate XML content (legacy method for compatibility)
      */
     async validateXML(xml) {
         try {
