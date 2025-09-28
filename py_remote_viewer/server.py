@@ -139,7 +139,23 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
             "version": "0.1.0",
             "clients_connected": signaling_server.stats["clients_connected"],
         })
-    
+
+    @app.post("/api/execute-command")
+    async def execute_command(request: Request):
+        """Execute simple text commands against the running simulation."""
+        try:
+            payload = await request.json()
+        except Exception as exc:
+            return JSONResponse({"success": False, "error": str(exc)}, status_code=400)
+
+        command = (payload.get("command") or "").strip()
+        if not command:
+            return JSONResponse({"success": False, "error": "Command is required"}, status_code=400)
+
+        result = await signaling_server.process_text_command(command)
+        status_code = 200 if result.get("success") else 400
+        return JSONResponse(result, status_code=status_code)
+
     @app.post("/api/scene/load")
     async def load_scene(request: Request):
         """Load a scene from XML."""

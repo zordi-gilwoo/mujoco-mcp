@@ -1,11 +1,18 @@
 """WebRTC signaling server using WebSocket endpoints."""
 
 import json
+import re
 import asyncio
 import logging
-from typing import Dict, Set, Optional
+from typing import Any, Dict, Set, Optional
 from fastapi import WebSocket, WebSocketDisconnect
-from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
+from aiortc import (
+    RTCPeerConnection,
+    RTCSessionDescription,
+    RTCConfiguration,
+    RTCIceServer,
+)
+from aiortc.sdp import candidate_from_sdp
 from aiortc.contrib.media import MediaPlayer
 
 from .config import ViewerConfig
@@ -48,9 +55,10 @@ class SignalingServer:
         
         # Scene management
         self.current_scene_xml = None
-        
+
         # Metrics reporter will be started when needed
         self._metrics_task = None
+        self._command_lock = asyncio.Lock()
     
     async def handle_websocket(self, websocket: WebSocket):
         """Handle a new WebSocket connection for signaling.
@@ -145,17 +153,6 @@ class SignalingServer:
             sdp=message["sdp"],
             type=message["type"]
         )
-        # Ensure we have a video transceiver ready (without attaching tracks yet)
-        video_transceiver = None
-        for transceiver in pc.getTransceivers():
-            if transceiver.kind == "video":
-                video_transceiver = transceiver
-                break
-
-        if video_transceiver is None:
-            logger.info(f"Creating video transceiver placeholder for {client_id}")
-            video_transceiver = pc.addTransceiver("video")
-
         logger.info(f"Setting remote description for {client_id}")
         await pc.setRemoteDescription(offer)
 
@@ -169,6 +166,22 @@ class SignalingServer:
                 getattr(transceiver, "_offerDirection", None),
                 transceiver.sender,
             )
+
+        # Select the video transceiver provided by the client's offer
+        video_transceiver = None
+        for transceiver in pc.getTransceivers():
+            if transceiver.kind == "video":
+                video_transceiver = transceiver
+                break
+
+        if video_transceiver is None:
+            logger.error(
+                "No video transceiver present in client offer for %s; SDP:\n%s",
+                client_id,
+                offer.sdp,
+            )
+            await self._cleanup_client(client_id)
+            return
 
         # Attach MuJoCo video track
         video_track = MuJoCoVideoTrack(self.config, self.simulation)
@@ -216,9 +229,25 @@ class SignalingServer:
         """
         pc = self.peer_connections.get(client_id)
         if pc:
-            candidate = message.get("candidate")
-            if candidate:
-                await pc.addIceCandidate(candidate)
+            candidate_payload = message.get("candidate")
+            if candidate_payload is None:
+                await pc.addIceCandidate(None)
+                return
+
+            candidate_sdp = candidate_payload.get("candidate")
+            if not candidate_sdp:
+                await pc.addIceCandidate(None)
+                return
+
+            if candidate_sdp.startswith("candidate:"):
+                candidate_sdp = candidate_sdp.split(":", 1)[1]
+
+            rtc_candidate = candidate_from_sdp(candidate_sdp)
+            rtc_candidate.sdpMid = candidate_payload.get("sdpMid")
+            rtc_candidate.sdpMLineIndex = candidate_payload.get("sdpMLineIndex")
+            rtc_candidate.usernameFragment = candidate_payload.get("usernameFragment")
+
+            await pc.addIceCandidate(rtc_candidate)
     
     async def _handle_event(self, client_id: str, message: Dict):
         """Handle input event from client.
@@ -285,7 +314,7 @@ class SignalingServer:
     
     def get_stats(self) -> Dict:
         """Get current server statistics.
-        
+
         Returns:
             Dict containing server metrics
         """
@@ -293,6 +322,65 @@ class SignalingServer:
             **self.stats,
             "simulation_state": self.simulation.get_state(),
         }
+
+    async def process_text_command(self, command: str) -> Dict[str, Any]:
+        """Execute simple text commands against the simulation."""
+        trimmed = (command or "").strip()
+        if not trimmed:
+            return {"success": False, "error": "Command is required"}
+
+        command_lower = trimmed.lower()
+
+        async with self._command_lock:
+            actions = []
+
+            try:
+                if any(keyword in command_lower for keyword in ("play", "start", "resume")):
+                    self.simulation.play()
+                    actions.append("play_simulation")
+                    message = "Simulation is now playing."
+
+                elif "pause" in command_lower:
+                    self.simulation.pause()
+                    actions.append("pause_simulation")
+                    message = "Simulation paused."
+
+                elif "reset" in command_lower:
+                    self.simulation.reset()
+                    actions.append("reset_simulation")
+                    message = "Simulation reset to its initial state."
+
+                elif "stop" in command_lower:
+                    self.simulation.stop()
+                    actions.append("stop_simulation")
+                    message = "Simulation stopped."
+
+                elif any(keyword in command_lower for keyword in ("step", "advance", "tick")):
+                    match = re.search(r"(\d+)", command_lower)
+                    steps = int(match.group(1)) if match else 1
+                    steps = max(1, steps)
+                    self.simulation.step(steps, force=True)
+                    actions.append("stepped_simulation")
+                    message = f"Stepped simulation {steps} step{'s' if steps != 1 else ''}."
+
+                else:
+                    return {
+                        "success": False,
+                        "error": f"Unsupported command: {trimmed}",
+                    }
+
+                self.stats["events_received"] += 1
+                logger.info("Processed text command '%s' -> %s", trimmed, message)
+
+                return {
+                    "success": True,
+                    "result": message,
+                    "actions_taken": actions,
+                }
+
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.exception("Failed to process command '%s'", trimmed)
+                return {"success": False, "error": str(exc)}
     
     async def broadcast_scene_update(self, scene_xml: str):
         """Broadcast scene update to all connected clients.

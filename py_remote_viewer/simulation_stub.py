@@ -94,13 +94,23 @@ class SimulationStub:
         print("[SimulationStub] Model loaded successfully (placeholder)")
         return True
     
-    def start(self):
-        """Start the simulation."""
-        if not self.state.is_running:
-            self.state.is_running = True
-            self.state.is_paused = False
-            self._last_step_time = time.time()
+    def play(self):
+        """Begin or resume playback for the placeholder simulation."""
+        was_running = self.state.is_running
+        was_paused = self.state.is_paused if was_running else False
+
+        self.state.is_running = True
+        self.state.is_paused = False
+        self._last_step_time = time.time()
+
+        if not was_running:
             print("[SimulationStub] Simulation started")
+        elif was_paused:
+            print("[SimulationStub] Simulation resumed")
+
+    def start(self):
+        """Backward compatible entry point for play()."""
+        self.play()
     
     def pause(self):
         """Pause the simulation."""
@@ -111,9 +121,7 @@ class SimulationStub:
     def resume(self):
         """Resume the simulation."""
         if self.state.is_running and self.state.is_paused:
-            self.state.is_paused = False
-            self._last_step_time = time.time()
-            print("[SimulationStub] Simulation resumed")
+            self.play()
     
     def stop(self):
         """Stop the simulation."""
@@ -128,18 +136,22 @@ class SimulationStub:
         self._initialize_placeholder_scene()
         print("[SimulationStub] Simulation reset")
     
-    def step(self, num_steps: int = 1):
+    def step(self, num_steps: int = 1, *, force: bool = False):
         """Step the simulation forward.
-        
+
         Args:
             num_steps: Number of simulation steps to execute
+            force: Execute steps even if playback is paused or stopped
         """
-        if not self.state.is_running or self.state.is_paused:
+        if num_steps <= 0:
             return
-        
+
+        if not force and (not self.state.is_running or self.state.is_paused):
+            return
+
         current_time = time.time()
         dt = current_time - self._last_step_time
-        
+
         for _ in range(num_steps):
             self._update_physics(self._step_size)
             self.state.step_count += 1
@@ -186,20 +198,32 @@ class SimulationStub:
         # Handle simulation-specific commands
         if hasattr(event, 'type') and hasattr(event, 'cmd'):
             cmd = getattr(event, 'cmd', None)
-            if cmd == "start":
-                self.start()
+            if cmd in {"play", "start"}:
+                self.play()
                 return True
             elif cmd == "pause":
                 self.pause()
                 return True
             elif cmd == "resume":
-                self.resume()
+                self.play()
                 return True
             elif cmd == "stop":
                 self.stop()
                 return True
             elif cmd == "reset":
                 self.reset()
+                return True
+            elif cmd == "step":
+                steps = 1
+                if hasattr(event, "params") and event.params:
+                    raw = event.params
+                    if isinstance(raw, dict):
+                        candidate = raw.get("num_steps") or raw.get("steps") or raw.get("count")
+                        if isinstance(candidate, (int, float)):
+                            steps = int(candidate)
+                        elif isinstance(candidate, str) and candidate.strip().isdigit():
+                            steps = int(candidate.strip())
+                self.step(max(1, steps), force=True)
                 return True
         
         return camera_modified

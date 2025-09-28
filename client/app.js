@@ -126,7 +126,7 @@ class RemoteViewer {
         this.elements.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
         
         // Simulation controls
-        this.elements.startSimBtn.addEventListener('click', () => this.sendCommand('start'));
+        this.elements.startSimBtn.addEventListener('click', () => this.sendCommand('play'));
         this.elements.pauseSimBtn.addEventListener('click', () => this.sendCommand('pause'));
         this.elements.resetSimBtn.addEventListener('click', () => this.sendCommand('reset'));
         
@@ -339,7 +339,7 @@ class RemoteViewer {
         this.peerConnection = new RTCPeerConnection({
             iceServers: this.config.stunServers
         });
-        
+
         // Handle incoming stream
         this.peerConnection.ontrack = (event) => {
             console.log('[RemoteViewer] Received remote stream');

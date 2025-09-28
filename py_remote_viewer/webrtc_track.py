@@ -2,6 +2,7 @@
 
 import asyncio
 import time
+from fractions import Fraction
 import numpy as np
 from typing import Tuple
 from av import VideoFrame
@@ -23,6 +24,8 @@ class MuJoCoVideoTrack(VideoStreamTrack):
         self.mujoco_simulation = mujoco_simulation
         self.start_time = time.time()
         self.frame_count = 0
+        self._sim_timestep = self._infer_sim_timestep()
+        self._step_accumulator = 0.0
         
         print(f"[MuJoCoVideoTrack] Initialized with {config.frame_width}x{config.frame_height} @ {config.frame_rate}fps")
         print(f"[MuJoCoVideoTrack] Using real MuJoCo rendering")
@@ -37,17 +40,22 @@ class MuJoCoVideoTrack(VideoStreamTrack):
             await asyncio.sleep(target_time - current_time)
         
         # Render frame from MuJoCo simulation
+        try:
+            self._advance_simulation()
+        except Exception as exc:
+            print(f"[MuJoCoVideoTrack] Simulation step error: {exc}")
+
         frame_data = self._render_mujoco_frame()
         
         # Create VideoFrame from numpy array
         frame = VideoFrame.from_ndarray(frame_data, format="rgb24")
         frame.pts = self.frame_count
-        frame.time_base = (1, self.config.frame_rate)
+        frame.time_base = Fraction(1, self.config.frame_rate)
         
         self.frame_count += 1
         
         return frame
-    
+
     def _render_mujoco_frame(self) -> np.ndarray:
         """Render a frame from the MuJoCo simulation.
         
@@ -109,10 +117,10 @@ class MuJoCoVideoTrack(VideoStreamTrack):
         self._draw_simple_text(frame, cam_text, (width - 120, height - 25))
         
         return frame
-    
+
     def _generate_error_frame(self) -> np.ndarray:
         """Generate an error frame when MuJoCo rendering fails.
-        
+
         Returns:
             np.ndarray: RGB error frame
         """
@@ -163,3 +171,41 @@ class MuJoCoVideoTrack(VideoStreamTrack):
                     frame[y+char_height-2:y+char_height, char_x:char_x+char_width] = [0, 0, 0]  # Bottom
                     frame[y:y+char_height, char_x:char_x+2] = [0, 0, 0]  # Left
                     frame[y:y+char_height, char_x+char_width-2:char_x+char_width] = [0, 0, 0]  # Right
+
+    def _advance_simulation(self):
+        """Advance the MuJoCo simulation to keep pace with real time."""
+        self._sync_sim_timestep()
+
+        frame_duration = 1.0 / max(self.config.frame_rate, 1)
+        self._step_accumulator += frame_duration
+
+        steps_to_run = 0
+        timestep = max(self._sim_timestep, 1e-4)
+
+        while self._step_accumulator >= timestep:
+            self._step_accumulator -= timestep
+            steps_to_run += 1
+
+        if steps_to_run == 0:
+            steps_to_run = 1
+
+        self.mujoco_simulation.step(steps_to_run)
+
+    def _infer_sim_timestep(self) -> float:
+        """Best effort estimate of the MuJoCo simulation timestep."""
+        try:
+            model = getattr(self.mujoco_simulation, "model", None)
+            if model is not None:
+                dt = float(getattr(model.opt, "timestep", 0.0))
+                if dt > 0:
+                    return dt
+        except Exception:
+            pass
+
+        return getattr(self.mujoco_simulation, "_step_size", 0.01)
+
+    def _sync_sim_timestep(self):
+        """Refresh cached timestep in case the model was reloaded."""
+        current_dt = self._infer_sim_timestep()
+        if abs(current_dt - self._sim_timestep) > 1e-6:
+            self._sim_timestep = current_dt

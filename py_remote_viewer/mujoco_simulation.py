@@ -28,6 +28,7 @@ class MuJoCoSimulation:
         self.model = None
         self.data = None
         self.renderer = None
+        self._free_camera = None
         self._initialized = False
         self._initialization_error = None
         
@@ -124,6 +125,7 @@ class MuJoCoSimulation:
             # Create renderer with default resolution
             # In headless environments, this may fail but simulation will still work
             self.renderer = mujoco.Renderer(self.model, width=640, height=480)
+            self._initialize_free_camera()
             print("[MuJoCoSimulation] Renderer initialized")
         except Exception as e:
             print(f"[MuJoCoSimulation] Renderer initialization failed (headless environment): {e}")
@@ -155,17 +157,46 @@ class MuJoCoSimulation:
         
         self.state.objects = objects
     
-    def start(self):
-        """Start the simulation."""
+    def play(self):
+        """Begin or resume continuous simulation playback."""
         if not self._initialized:
-            print("[MuJoCoSimulation] Cannot start - model not loaded")
+            print("[MuJoCoSimulation] Cannot play - model not loaded")
             return
-            
-        if not self.state.is_running:
-            self.state.is_running = True
-            self.state.is_paused = False
-            self._last_step_time = time.time()
-            print("[MuJoCoSimulation] Simulation started")
+
+        was_running = self.state.is_running
+        was_paused = self.state.is_paused if was_running else False
+
+        self._kick_from_rest()
+
+        self.state.is_running = True
+        self.state.is_paused = False
+        self._last_step_time = time.time()
+
+        if not was_running:
+            print("[MuJoCoSimulation] Simulation playing")
+        elif was_paused:
+            print("[MuJoCoSimulation] Simulation resumed")
+
+    def _kick_from_rest(self):
+        """Apply a small perturbation so the model moves when playback starts."""
+        if (
+            self.data is None
+            or self.model is None
+            or self.model.nq <= 0
+        ):
+            return
+
+        if np.allclose(self.data.qpos, self.model.qpos0) and np.allclose(self.data.qvel, 0):
+            perturb = np.zeros(self.model.nq)
+            perturb[0] = np.deg2rad(10.0)
+            self.data.qpos[:] = self.model.qpos0 + perturb
+            self.data.qvel[:] = 0
+            mujoco.mj_forward(self.model, self.data)
+            self._log_state(prefix="kick")
+
+    def start(self):
+        """Backward compatible entry point for play()."""
+        self.play()
     
     def pause(self):
         """Pause the simulation."""
@@ -176,9 +207,7 @@ class MuJoCoSimulation:
     def resume(self):
         """Resume the simulation."""
         if self.state.is_running and self.state.is_paused:
-            self.state.is_paused = False
-            self._last_step_time = time.time()
-            print("[MuJoCoSimulation] Simulation resumed")
+            self.play()
     
     def stop(self):
         """Stop the simulation."""
@@ -197,23 +226,31 @@ class MuJoCoSimulation:
         # Reset state counters
         self.state.time = 0.0
         self.state.step_count = 0
+        self.state.is_paused = False
         
         # Update objects
         self._update_simulation_objects()
         
         print("[MuJoCoSimulation] Simulation reset")
     
-    def step(self, num_steps: int = 1):
+    def step(self, num_steps: int = 1, *, force: bool = False):
         """Step the simulation forward.
-        
+
         Args:
             num_steps: Number of simulation steps to execute
+            force: Execute steps even if the simulation is paused or stopped
         """
-        if not self._initialized or not self.state.is_running or self.state.is_paused:
+        if not self._initialized:
             return
-        
+
+        if num_steps <= 0:
+            return
+
+        if not force and (not self.state.is_running or self.state.is_paused):
+            return
+
         current_time = time.time()
-        
+
         for _ in range(num_steps):
             # Step MuJoCo simulation
             mujoco.mj_step(self.model, self.data)
@@ -225,6 +262,9 @@ class MuJoCoSimulation:
         self._update_simulation_objects()
         
         self._last_step_time = current_time
+
+        if force or self.state.step_count % 60 == 0:
+            self._log_state(prefix="step")
     
     def render_frame(self, width: int = 640, height: int = 480, camera_id: int = -1) -> Optional[np.ndarray]:
         """Render a frame from the current simulation state.
@@ -243,13 +283,18 @@ class MuJoCoSimulation:
         try:
             # Update renderer size if needed
             if self.renderer.width != width or self.renderer.height != height:
+                # Recreate renderer at the requested resolution
                 self.renderer = mujoco.Renderer(self.model, width=width, height=height)
-            
-            # Apply camera settings
-            self._apply_camera_settings(camera_id)
-            
+                self._initialize_free_camera()
+
+            # Ensure derived quantities are up to date before rendering
+            mujoco.mj_forward(self.model, self.data)
+
+            # Apply camera settings and update scene with the requested view
+            camera_handle = self._apply_camera_settings(camera_id)
+
             # Update scene and render
-            self.renderer.update_scene(self.data)
+            self.renderer.update_scene(self.data, camera=camera_handle)
             frame = self.renderer.render()
             
             return frame
@@ -258,27 +303,34 @@ class MuJoCoSimulation:
             print(f"[MuJoCoSimulation] Rendering failed: {e}")
             return None
     
+    def _initialize_free_camera(self):
+        """Create and initialize the free camera used for custom views."""
+        self._free_camera = mujoco.MjvCamera()
+        mujoco.mjv_defaultFreeCamera(self.model, self._free_camera)
+
     def _apply_camera_settings(self, camera_id: int = -1):
         """Apply camera state to the renderer.
-        
+
         Args:
             camera_id: Camera ID to use (-1 for free camera)
         """
         if camera_id >= 0 and camera_id < self.model.ncam:
-            # Use fixed camera
-            cam = self.renderer.camera
-            cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
-            cam.fixedcamid = camera_id
-        else:
-            # Use free camera with current camera state
-            cam = self.renderer.camera
-            cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-            
-            # Convert camera state to MuJoCo camera parameters
-            cam.distance = self.camera.distance
-            cam.azimuth = np.radians(self.camera.azimuth)
-            cam.elevation = np.radians(self.camera.elevation)
-            cam.lookat[:] = self.camera.target
+            # Use fixed camera defined in the model
+            return camera_id
+
+        if self._free_camera is None:
+            self._initialize_free_camera()
+
+        cam = self._free_camera
+        cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+        cam.fixedcamid = -1
+        cam.trackbodyid = -1
+        cam.distance = self.camera.distance
+        cam.azimuth = self.camera.azimuth
+        cam.elevation = self.camera.elevation
+        cam.lookat[:] = self.camera.target
+
+        return cam
     
     def handle_event(self, event: EventData) -> bool:
         """Handle input event.
@@ -297,14 +349,14 @@ class MuJoCoSimulation:
         # Handle simulation-specific commands
         if hasattr(event, 'type') and hasattr(event, 'cmd'):
             cmd = getattr(event, 'cmd', None)
-            if cmd == "start":
-                self.start()
+            if cmd == "play" or cmd == "start":
+                self.play()
                 return True
             elif cmd == "pause":
                 self.pause()
                 return True
             elif cmd == "resume":
-                self.resume()
+                self.play()
                 return True
             elif cmd == "stop":
                 self.stop()
@@ -312,8 +364,32 @@ class MuJoCoSimulation:
             elif cmd == "reset":
                 self.reset()
                 return True
-        
+            elif cmd == "step":
+                steps = 1
+                if hasattr(event, "params") and event.params:
+                    raw = event.params
+                    if isinstance(raw, dict):
+                        candidate = raw.get("num_steps") or raw.get("steps") or raw.get("count")
+                        if isinstance(candidate, (int, float)):
+                            steps = int(candidate)
+                        elif isinstance(candidate, str) and candidate.strip().isdigit():
+                            steps = int(candidate.strip())
+                self.step(max(1, steps), force=True)
+                return True
+
         return camera_modified
+
+    def _log_state(self, prefix: str = "state"):
+        if not self._initialized or self.data is None:
+            return
+
+        qpos = np.array(self.data.qpos[: min(4, self.model.nq)])
+        qvel = np.array(self.data.qvel[: min(4, self.model.nv)])
+        print(
+            f"[MuJoCoSimulation] {prefix}: t={self.data.time:.3f} "
+            f"qpos={np.array2string(qpos, precision=3, suppress_small=True)} "
+            f"qvel={np.array2string(qvel, precision=3, suppress_small=True)}"
+        )
     
     def get_state(self) -> Dict[str, Any]:
         """Get current simulation state.

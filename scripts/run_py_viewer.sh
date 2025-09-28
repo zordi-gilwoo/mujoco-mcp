@@ -26,8 +26,8 @@ fi
 # Set default environment variables
 export VIEWER_HOST="${VIEWER_HOST:-localhost}"
 export VIEWER_PORT="${VIEWER_PORT:-8000}"
-export LOG_LEVEL="${LOG_LEVEL:-INFO}"
-export DEBUG_MODE="${DEBUG_MODE:-0}"
+export LOG_LEVEL="${LOG_LEVEL:-DEBUG}"
+export DEBUG_MODE="${DEBUG_MODE:-1}"
 
 echo "📋 Configuration:"
 echo "  Host: $VIEWER_HOST"
