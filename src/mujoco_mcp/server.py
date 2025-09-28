@@ -118,6 +118,13 @@ class MuJoCoServer:
         self.name = "mujoco-mcp"
         self.version = __version__
         self.description = "MuJoCo Model Context Protocol Server - A physics simulation server that enables AI agents to control MuJoCo simulations"
+        self._initialized = False
+
+    async def initialize(self) -> None:
+        """Prepare legacy server state for compatibility workflows."""
+        if not self._initialized:
+            logger.info("MuJoCoServer legacy compatibility initialization complete")
+            self._initialized = True
 
     def get_server_info(self) -> Dict[str, Any]:
         """Get server information for MCP compliance"""

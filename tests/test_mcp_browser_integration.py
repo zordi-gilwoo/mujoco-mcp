@@ -60,8 +60,9 @@ class MockBrowserSession:
     
     async def simulate_command_execution(self, command: str):
         """Simulate the full command execution flow"""
-        # Step 1: Input command
-        await self.simulate_command_input(command)
+        # Step 1: Input command (avoid duplicate history entries)
+        if not self.session_data["command_history"] or self.session_data["command_history"][-1] != command:
+            await self.simulate_command_input(command)
         
         # Step 2: Click execute button
         await self.simulate_button_click("execute-command-btn")
