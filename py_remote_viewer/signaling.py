@@ -19,6 +19,7 @@ from .config import ViewerConfig
 from .webrtc_track import MuJoCoVideoTrack
 from .events import EventProtocol
 from .mujoco_simulation import MuJoCoSimulation
+from .builtin_scenes import get_builtin_scene
 
 logger = logging.getLogger(__name__)
 
@@ -333,6 +334,7 @@ class SignalingServer:
 
         async with self._command_lock:
             actions = []
+            response_payload: Dict[str, Any] = {}
 
             try:
                 if any(keyword in command_lower for keyword in ("play", "start", "resume")):
@@ -363,11 +365,35 @@ class SignalingServer:
                     actions.append("stepped_simulation")
                     message = f"Stepped simulation {steps} step{'s' if steps != 1 else ''}."
 
+                elif any(keyword in command_lower for keyword in ("state", "status", "info")):
+                    response_payload["state"] = self.simulation.get_state()
+                    actions.append("reported_state")
+                    message = "Retrieved current simulation state."
+
                 else:
-                    return {
-                        "success": False,
-                        "error": f"Unsupported command: {trimmed}",
-                    }
+                    builtin_scene = self._match_builtin_scene(command_lower)
+                    if builtin_scene:
+                        success = self.simulation.load_builtin_scene(builtin_scene)
+                        if not success:
+                            return {
+                                "success": False,
+                                "error": f"Failed to load built-in scene '{builtin_scene}'",
+                            }
+
+                        scene_xml = get_builtin_scene(builtin_scene)
+                        if scene_xml:
+                            await self.broadcast_scene_update(scene_xml, load_into_simulation=False)
+                            response_payload["scene_xml"] = scene_xml
+                            response_payload["scene_name"] = builtin_scene
+
+                        actions.append("created_scene")
+                        pretty_name = builtin_scene.replace("_", " ")
+                        message = f"Loaded built-in {pretty_name} scene."
+                    else:
+                        return {
+                            "success": False,
+                            "error": f"Unsupported command: {trimmed}",
+                        }
 
                 self.stats["events_received"] += 1
                 logger.info("Processed text command '%s' -> %s", trimmed, message)
@@ -376,32 +402,45 @@ class SignalingServer:
                     "success": True,
                     "result": message,
                     "actions_taken": actions,
+                    **response_payload,
                 }
 
             except Exception as exc:  # pragma: no cover - defensive logging
                 logger.exception("Failed to process command '%s'", trimmed)
                 return {"success": False, "error": str(exc)}
-    
-    async def broadcast_scene_update(self, scene_xml: str):
+
+    def _match_builtin_scene(self, command_lower: str) -> Optional[str]:
+        """Best-effort mapping from natural language command to a scene key."""
+        if any(keyword in command_lower for keyword in ("cart pole", "cart-pole", "cartpole")):
+            return "cartpole"
+        if "pendulum" in command_lower:
+            return "pendulum"
+        if any(keyword in command_lower for keyword in ("franka", "panda")):
+            return "franka_panda"
+        return None
+
+    async def broadcast_scene_update(self, scene_xml: str, *, load_into_simulation: bool = True):
         """Broadcast scene update to all connected clients.
-        
+
         Args:
             scene_xml: MuJoCo XML content for the scene
+            load_into_simulation: Whether to reload the scene in the running simulation
         """
         self.current_scene_xml = scene_xml
-        
+
         # Try to load the scene in the simulation
-        try:
-            if hasattr(self.simulation, 'load_model'):
-                success = self.simulation.load_model(scene_xml)
-                if success:
-                    logger.info("Scene loaded into simulation successfully")
+        if load_into_simulation:
+            try:
+                if hasattr(self.simulation, 'load_model'):
+                    success = self.simulation.load_model(scene_xml)
+                    if success:
+                        logger.info("Scene loaded into simulation successfully")
+                    else:
+                        logger.warning("Scene loading returned False - may have failed")
                 else:
-                    logger.warning("Scene loading returned False - may have failed")
-            else:
-                logger.warning("Simulation does not support model loading")
-        except Exception as e:
-            logger.error(f"Failed to load scene into simulation: {e}")
+                    logger.warning("Simulation does not support model loading")
+            except Exception as e:
+                logger.error(f"Failed to load scene into simulation: {e}")
         
         # Broadcast to all connected WebSocket clients
         message = {

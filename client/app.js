@@ -120,6 +120,12 @@ class RemoteViewer {
      * Setup event listeners
      */
     setupEventListeners() {
+        const safeOn = (element, event, handler) => {
+            if (element) {
+                element.addEventListener(event, handler);
+            }
+        };
+
         // Connection controls
         this.elements.connectBtn.addEventListener('click', () => this.connect());
         this.elements.disconnectBtn.addEventListener('click', () => this.disconnect());
@@ -143,20 +149,20 @@ class RemoteViewer {
         this.elements.xmlEditor.addEventListener('input', () => this.handleXmlEditorChange());
         this.elements.rlEditor.addEventListener('input', () => this.handleRlEditorChange())
         // Scene creation controls
-        this.elements.scenePresetDropdown.addEventListener('change', (e) => {
+        safeOn(this.elements.scenePresetDropdown, 'change', (e) => {
             if (e.target.value) {
                 this.elements.scenePromptInput.value = e.target.value;
                 this.handlePromptChange();
             }
         });
-        
-        this.elements.scenePromptInput.addEventListener('input', () => {
+
+        safeOn(this.elements.scenePromptInput, 'input', () => {
             this.handlePromptChange();
         });
-        
-        this.elements.generateSceneBtn.addEventListener('click', () => this.generateScene());
-        this.elements.loadSceneBtn.addEventListener('click', () => this.loadScene());
-        this.elements.toggleSceneXmlBtn.addEventListener('click', () => this.toggleSceneXmlEditor());
+
+        safeOn(this.elements.generateSceneBtn, 'click', () => this.generateScene());
+        safeOn(this.elements.loadSceneBtn, 'click', () => this.loadScene());
+        safeOn(this.elements.toggleSceneXmlBtn, 'click', () => this.toggleSceneXmlEditor());
         
         // Camera presets
         this.elements.presetBtns.forEach(btn => {
@@ -371,7 +377,18 @@ class RemoteViewer {
                 this.disconnect();
             }
         };
-        
+
+        // Ensure the offer advertises a recvonly video transceiver so the server
+        // can attach its MuJoCo track. Without this Chrome 140+ omits video m-lines
+        // and the server rejects the negotiation.
+        try {
+            if (this.peerConnection.getTransceivers().length === 0) {
+                this.peerConnection.addTransceiver('video', { direction: 'recvonly' });
+            }
+        } catch (error) {
+            console.warn('[RemoteViewer] Failed to add recvonly video transceiver:', error);
+        }
+
         // Create offer
         const offer = await this.peerConnection.createOffer();
         await this.peerConnection.setLocalDescription(offer);

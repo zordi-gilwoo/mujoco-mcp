@@ -10,6 +10,7 @@ import mujoco
 from .camera_state import CameraState
 from .events import EventData
 from .simulation_stub import SimulationState  # Reuse the state structure
+from .builtin_scenes import get_builtin_scene, default_scene_xml
 
 
 class MuJoCoSimulation:
@@ -34,7 +35,7 @@ class MuJoCoSimulation:
         
         # Default to a simple pendulum if no model provided
         if model_xml is None:
-            model_xml = self._get_default_model()
+            model_xml = default_scene_xml()
         
         # Try to load model with graceful error handling
         try:
@@ -44,43 +45,13 @@ class MuJoCoSimulation:
             print(f"[MuJoCoSimulation] Failed to initialize: {e}")
             print("[MuJoCoSimulation] Will continue with error frames")
     
-    def _get_default_model(self) -> str:
-        """Get a default MuJoCo model for demonstration."""
-        return """
-        <mujoco model="pendulum">
-            <compiler angle="radian"/>
-            
-            <asset>
-                <material name="MatPlane" reflectance="0.5" texture="TexPlane" texrepeat="1 1" texuniform="true"/>
-                <texture name="TexPlane" type="2d" builtin="checker" rgb1=".2 .3 .4" rgb2=".1 .2 .3" width="512" height="512"/>
-            </asset>
-            
-            <default>
-                <joint damping="0.05"/>
-                <geom contype="0" friction="1 0.1 0.1" rgba="0.7 0.7 0 1"/>
-            </default>
-            
-            <worldbody>
-                <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
-                <camera name="track" mode="trackcom" pos="0 -2 1" xyaxes="1 0 0 0 1 2"/>
-                
-                <geom name="floor" pos="0 0 -0.5" size="2 2 0.1" type="plane" material="MatPlane"/>
-                
-                <body name="pole" pos="0 0 1">
-                    <joint name="hinge" type="hinge" axis="1 0 0" pos="0 0 0"/>
-                    <geom name="pole" type="capsule" size="0.045" fromto="0 0 0 0 0 -1" rgba="0 0.7 0.7 1"/>
-                    
-                    <body name="mass" pos="0 0 -1">
-                        <geom name="mass" type="sphere" size="0.15" rgba="1 0 0 1"/>
-                    </body>
-                </body>
-            </worldbody>
-            
-            <actuator>
-                <motor joint="hinge" gear="1" ctrllimited="true" ctrlrange="-3 3"/>
-            </actuator>
-        </mujoco>
-        """
+    def load_builtin_scene(self, name: str) -> bool:
+        """Load one of the bundled demo scenes by keyword."""
+        xml = get_builtin_scene(name)
+        if xml is None:
+            print(f"[MuJoCoSimulation] Unknown builtin scene '{name}'")
+            return False
+        return self.load_model(xml)
     
     def load_model(self, model_xml: str) -> bool:
         """Load a MuJoCo model from XML string.
@@ -93,7 +64,8 @@ class MuJoCoSimulation:
         """
         try:
             print(f"[MuJoCoSimulation] Loading MuJoCo model...")
-            
+            was_running = getattr(self.state, "is_running", False)
+
             # Load model and create data
             self.model = mujoco.MjModel.from_xml_string(model_xml)
             self.data = mujoco.MjData(self.model)
@@ -112,6 +84,10 @@ class MuJoCoSimulation:
             print(f"  - Joints: {self.model.njnt}")
             print(f"  - Degrees of freedom: {self.model.nq}")
             print(f"  - Actuators: {self.model.nu}")
+
+            # Resume playback automatically so scene changes are visible immediately
+            if was_running or not self.state.is_running:
+                self.play()
             
             return True
             
