@@ -83,8 +83,8 @@ class SignalingServer:
                 
         except WebSocketDisconnect:
             logger.info(f"Client {client_id} disconnected")
-        except Exception as e:
-            logger.error(f"Error handling client {client_id}: {e}")
+        except Exception:
+            logger.exception(f"Error handling client {client_id}")
         finally:
             await self._cleanup_client(client_id)
     
@@ -114,16 +114,17 @@ class SignalingServer:
             message: Offer message containing SDP
         """
         logger.info(f"Handling offer from {client_id}")
-        
+
         # Create peer connection with explicit configuration object
         configuration = RTCConfiguration(
-            iceServers=[RTCIceServer(urls=[self.config.stun_server])]
+            iceServers=[RTCIceServer(urls=[self.config.stun_server])],
+            bundlePolicy="balanced",
         )
         pc = RTCPeerConnection(configuration=configuration)
-        
+
         # Store the peer connection
         self.peer_connections[client_id] = pc
-        
+
         # Set up event handlers
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
@@ -138,29 +139,72 @@ class SignalingServer:
                     "type": "ice-candidate",
                     "candidate": candidate.to_dict()
                 })
-        
-        # Add video track - always use MuJoCo
-        video_track = MuJoCoVideoTrack(self.config, self.simulation)
-        
-        pc.addTrack(video_track)
-        
+
         # Set remote description (offer)
         offer = RTCSessionDescription(
             sdp=message["sdp"],
             type=message["type"]
         )
+        # Ensure we have a video transceiver ready (without attaching tracks yet)
+        video_transceiver = None
+        for transceiver in pc.getTransceivers():
+            if transceiver.kind == "video":
+                video_transceiver = transceiver
+                break
+
+        if video_transceiver is None:
+            logger.info(f"Creating video transceiver placeholder for {client_id}")
+            video_transceiver = pc.addTransceiver("video")
+
+        logger.info(f"Setting remote description for {client_id}")
         await pc.setRemoteDescription(offer)
-        
+
+        # Inspect transceivers contributed by the offer
+        for idx, transceiver in enumerate(pc.getTransceivers()):
+            logger.info(
+                "Offer transceiver %s: kind=%s direction=%s offer_direction=%s sender=%s",
+                idx,
+                transceiver.kind,
+                getattr(transceiver, "direction", None),
+                getattr(transceiver, "_offerDirection", None),
+                transceiver.sender,
+            )
+
+        # Attach MuJoCo video track
+        video_track = MuJoCoVideoTrack(self.config, self.simulation)
+        logger.info(f"Attaching MuJoCo video track for {client_id}")
+        video_transceiver.direction = "sendonly"
+
+        if video_transceiver.sender:
+            video_transceiver.sender.replaceTrack(video_track)
+        else:
+            logger.info("Video transceiver missing sender; adding track explicitly")
+            pc.addTrack(video_track)
+
+        # Inspect transceivers after configuring track
+        for idx, transceiver in enumerate(pc.getTransceivers()):
+            logger.info(
+                "Post-config transceiver %s: kind=%s direction=%s offer_direction=%s sender=%s",
+                idx,
+                transceiver.kind,
+                getattr(transceiver, "direction", None),
+                getattr(transceiver, "_offerDirection", None),
+                transceiver.sender,
+            )
+
         # Create answer
+        logger.info(f"Creating answer for {client_id}")
         answer = await pc.createAnswer()
+        logger.info(f"Setting local description for {client_id}")
         await pc.setLocalDescription(answer)
-        
+
         # Send answer to client
+        logger.info(f"Sending answer to {client_id}")
         await self._send_to_client(client_id, {
             "type": "answer",
             "sdp": pc.localDescription.sdp
         })
-        
+
         logger.info(f"Sent answer to {client_id}")
     
     async def _handle_ice_candidate(self, client_id: str, message: Dict):
