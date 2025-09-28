@@ -5,7 +5,7 @@ import asyncio
 import logging
 from typing import Dict, Set, Optional
 from fastapi import WebSocket, WebSocketDisconnect
-from aiortc import RTCPeerConnection, RTCSessionDescription
+from aiortc import RTCPeerConnection, RTCSessionDescription, RTCConfiguration, RTCIceServer
 from aiortc.contrib.media import MediaPlayer
 
 from .config import ViewerConfig
@@ -115,10 +115,11 @@ class SignalingServer:
         """
         logger.info(f"Handling offer from {client_id}")
         
-        # Create peer connection
-        pc = RTCPeerConnection(configuration={
-            "iceServers": [{"urls": [self.config.stun_server]}]
-        })
+        # Create peer connection with explicit configuration object
+        configuration = RTCConfiguration(
+            iceServers=[RTCIceServer(urls=[self.config.stun_server])]
+        )
+        pc = RTCPeerConnection(configuration=configuration)
         
         # Store the peer connection
         self.peer_connections[client_id] = pc
