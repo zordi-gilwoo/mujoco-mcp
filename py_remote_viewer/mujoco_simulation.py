@@ -2,6 +2,7 @@
 
 import time
 import asyncio
+import os
 import numpy as np
 from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
@@ -55,7 +56,7 @@ class MuJoCoSimulation:
     
     def load_model(self, model_xml: str) -> bool:
         """Load a MuJoCo model from XML string.
-        
+
         Args:
             model_xml: MuJoCo model XML string
             
@@ -67,9 +68,16 @@ class MuJoCoSimulation:
             was_running = getattr(self.state, "is_running", False)
 
             # Load model and create data
-            self.model = mujoco.MjModel.from_xml_string(model_xml)
+            if isinstance(model_xml, str) and os.path.exists(model_xml):
+                model_source_desc = f"path={model_xml}"
+                mj_model = mujoco.MjModel.from_xml_path(model_xml)
+            else:
+                model_source_desc = f"xml[{len(model_xml)} chars]"
+                mj_model = mujoco.MjModel.from_xml_string(model_xml)
+
+            self.model = mj_model
             self.data = mujoco.MjData(self.model)
-            
+
             # Initialize renderer for frame capture
             self._initialize_renderer()
             
@@ -79,7 +87,7 @@ class MuJoCoSimulation:
             self._update_simulation_objects()
             
             self._initialized = True
-            print(f"[MuJoCoSimulation] Model loaded successfully")
+            print(f"[MuJoCoSimulation] Model loaded successfully from {model_source_desc}")
             print(f"  - Bodies: {self.model.nbody}")
             print(f"  - Joints: {self.model.njnt}")
             print(f"  - Degrees of freedom: {self.model.nq}")

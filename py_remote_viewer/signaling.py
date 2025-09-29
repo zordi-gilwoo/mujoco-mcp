@@ -4,7 +4,7 @@ import json
 import re
 import asyncio
 import logging
-from typing import Any, Dict, Set, Optional
+from typing import Any, Dict, Set, Optional, Tuple
 from fastapi import WebSocket, WebSocketDisconnect
 from aiortc import (
     RTCPeerConnection,
@@ -20,6 +20,7 @@ from .webrtc_track import MuJoCoVideoTrack
 from .events import EventProtocol
 from .mujoco_simulation import MuJoCoSimulation
 from .builtin_scenes import get_builtin_scene
+from src.mujoco_mcp.menagerie_loader import MenagerieLoader
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,10 @@ class SignalingServer:
             "frames_sent": 0,
             "events_received": 0,
         }
-        
+
         # Scene management
         self.current_scene_xml = None
+        self.menagerie_loader = MenagerieLoader()
 
         # Metrics reporter will be started when needed
         self._metrics_task = None
@@ -373,22 +375,36 @@ class SignalingServer:
                 else:
                     builtin_scene = self._match_builtin_scene(command_lower)
                     if builtin_scene:
-                        success = self.simulation.load_builtin_scene(builtin_scene)
-                        if not success:
-                            return {
-                                "success": False,
-                                "error": f"Failed to load built-in scene '{builtin_scene}'",
-                            }
+                        if builtin_scene == "franka_panda":
+                            success, scene_xml, scene_path = self._load_menagerie_scene("franka_emika_panda")
+                            if not success:
+                                return {"success": False, "error": scene_path}
 
-                        scene_xml = get_builtin_scene(builtin_scene)
-                        if scene_xml:
-                            await self.broadcast_scene_update(scene_xml, load_into_simulation=False)
-                            response_payload["scene_xml"] = scene_xml
-                            response_payload["scene_name"] = builtin_scene
+                            if scene_xml:
+                                await self.broadcast_scene_update(scene_xml, load_into_simulation=False)
+                                response_payload["scene_xml"] = scene_xml
+                            response_payload["scene_name"] = "franka_emika_panda"
+                            response_payload["scene_path"] = scene_path
 
-                        actions.append("created_scene")
-                        pretty_name = builtin_scene.replace("_", " ")
-                        message = f"Loaded built-in {pretty_name} scene."
+                            actions.append("created_menagerie_scene")
+                            message = "Loaded Franka Panda menagerie scene."
+                        else:
+                            success = self.simulation.load_builtin_scene(builtin_scene)
+                            if not success:
+                                return {
+                                    "success": False,
+                                    "error": f"Failed to load built-in scene '{builtin_scene}'",
+                                }
+
+                            scene_xml = get_builtin_scene(builtin_scene)
+                            if scene_xml:
+                                await self.broadcast_scene_update(scene_xml, load_into_simulation=False)
+                                response_payload["scene_xml"] = scene_xml
+                                response_payload["scene_name"] = builtin_scene
+
+                            actions.append("created_scene")
+                            pretty_name = builtin_scene.replace("_", " ")
+                            message = f"Loaded built-in {pretty_name} scene."
                     else:
                         return {
                             "success": False,
@@ -418,6 +434,34 @@ class SignalingServer:
         if any(keyword in command_lower for keyword in ("franka", "panda")):
             return "franka_panda"
         return None
+
+    def _load_menagerie_scene(self, model_name: str) -> Tuple[bool, Optional[str], str]:
+        """Load a Menagerie model by name into the simulation."""
+
+        try:
+            scene_path = self.menagerie_loader.get_model_file(model_name)
+        except FileNotFoundError as exc:
+            return False, None, str(exc)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.exception("Failed to locate menagerie model '%s'", model_name)
+            return False, None, str(exc)
+
+        if not self.simulation.load_model(str(scene_path)):
+            hint = ""
+            if self.menagerie_loader.menagerie_root is None:
+                hint = (
+                    " Ensure MUJOCO_MENAGERIE_PATH points to a local mujoco_menagerie checkout "
+                    "so meshes and textures are available."
+                )
+            return False, None, f"Failed to load menagerie scene from {scene_path}.{hint}"
+
+        try:
+            xml_text = scene_path.read_text()
+        except Exception as exc:
+            logger.warning("Loaded scene from %s but failed to read XML: %s", scene_path, exc)
+            xml_text = None
+
+        return True, xml_text, str(scene_path)
 
     async def broadcast_scene_update(self, scene_xml: str, *, load_into_simulation: bool = True):
         """Broadcast scene update to all connected clients.

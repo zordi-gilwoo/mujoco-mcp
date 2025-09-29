@@ -562,7 +562,11 @@ class RemoteViewer {
      */
     handleKeyDown(e) {
         if (!this.isConnected) return;
-        
+
+        if (this._isTypingTarget(e.target)) {
+            return;
+        }
+
         // Handle special keys
         if (e.code === 'Space') {
             this.sendCommand('pause');
@@ -591,7 +595,11 @@ class RemoteViewer {
      */
     handleKeyUp(e) {
         if (!this.isConnected) return;
-        
+
+        if (this._isTypingTarget(e.target)) {
+            return;
+        }
+
         this.sendEvent({
             type: 'key_up',
             code: e.code,
@@ -1748,7 +1756,7 @@ if __name__ == "__main__":
             this.elements.runRlBtn.textContent = 'Run Script';
         }
     }
-    
+
     /**
      * Set validation status for editors (separate from the legacy method)
      */
@@ -1765,6 +1773,36 @@ if __name__ == "__main__":
             statusElement.className = `validation-status ${status}`;
             statusElement.textContent = message;
         }
+    }
+
+    _isTypingTarget(target) {
+        if (!target) {
+            return false;
+        }
+
+        const candidate = target.closest?.('textarea, input, [contenteditable="true"]') || target;
+
+        if (candidate instanceof HTMLInputElement) {
+            const nonTextTypes = new Set([
+                'button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color',
+                'file', 'image', 'date', 'datetime-local', 'month', 'week', 'time', 'hidden'
+            ]);
+            const type = (candidate.type || 'text').toLowerCase();
+            if (nonTextTypes.has(type)) {
+                return false;
+            }
+            return !candidate.disabled && !candidate.readOnly;
+        }
+
+        if (candidate instanceof HTMLTextAreaElement) {
+            return !candidate.disabled && !candidate.readOnly;
+        }
+
+        if (candidate.isContentEditable) {
+            return true;
+        }
+
+        return false;
     }
 }
 

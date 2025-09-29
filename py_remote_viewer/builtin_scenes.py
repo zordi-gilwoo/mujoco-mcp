@@ -86,7 +86,7 @@ _FRANKA_PANDA_XML = """
 
     <worldbody>
         <light name="light" pos="1 1 2" dir="-1 -1 -2" diffuse="0.8 0.8 0.8" specular="0.3 0.3 0.3"/>
-        <camera name="track" pos="2 -2 1.5" lookat="0 0 0.5"/>
+        <camera name="track" pos="2 -2 1.5" xyaxes="0.7071 0.7071 0 -0.2357 0.2357 0.9428"/>
         <geom name="table" type="box" size="0.4 0.4 0.02" pos="0 0 -0.02" rgba="0.4 0.3 0.2 1"/>
 
         <body name="base" pos="0 0 0">
@@ -196,4 +196,3 @@ def default_scene_xml() -> str:
 def list_builtin_scenes() -> Dict[str, str]:
     """Expose a copy of the built-in scene mapping."""
     return dict(_BUILTIN_SCENES)
-
