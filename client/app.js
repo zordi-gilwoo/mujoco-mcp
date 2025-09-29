@@ -15,6 +15,7 @@ class RemoteViewer {
         this.isConnecting = false;
         this.frameCount = 0;
         this.eventCount = 0;
+        this.reconnectTimer = null;
         
         // Scene creation state
         this.currentSceneXML = null;
@@ -47,7 +48,8 @@ class RemoteViewer {
         this.setupDOM();
         this.setupEventListeners();
         this.updateUI();
-        this.loadConfig();
+        this.loadConfig()
+            .finally(() => this.autoConnect());
         
         console.log('[RemoteViewer] Initialized');
     }
@@ -69,8 +71,6 @@ class RemoteViewer {
             videoContainer: document.querySelector('.video-container'),
             
             // Control buttons
-            connectBtn: document.getElementById('connect-btn'),
-            disconnectBtn: document.getElementById('disconnect-btn'),
             fullscreenBtn: document.getElementById('fullscreen-btn'),
             
             // Simulation controls
@@ -127,9 +127,7 @@ class RemoteViewer {
         };
 
         // Connection controls
-        this.elements.connectBtn.addEventListener('click', () => this.connect());
-        this.elements.disconnectBtn.addEventListener('click', () => this.disconnect());
-        this.elements.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        safeOn(this.elements.fullscreenBtn, 'click', () => this.toggleFullscreen());
         
         // Simulation controls
         this.elements.startSimBtn.addEventListener('click', () => this.sendCommand('play'));
@@ -207,7 +205,7 @@ class RemoteViewer {
         document.addEventListener('keyup', (e) => this.handleKeyUp(e));
         
         // Window events
-        window.addEventListener('beforeunload', () => this.disconnect());
+        window.addEventListener('beforeunload', () => this.disconnect({ scheduleReconnect: false }));
         
         // Fullscreen change
         document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
@@ -249,11 +247,51 @@ class RemoteViewer {
             console.warn('[RemoteViewer] Failed to load config:', error);
         }
     }
-    
+
+    /**
+     * Automatically initiate a connection if not already connected
+     */
+    autoConnect() {
+        if (this.isConnected || this.isConnecting) {
+            return;
+        }
+
+        console.log('[RemoteViewer] Auto-connecting to server');
+        this.connect();
+    }
+
+    /**
+     * Clear any pending reconnect timers
+     */
+    clearReconnectTimer() {
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+    }
+
+    /**
+     * Schedule a reconnect attempt with a small delay
+     */
+    scheduleReconnect(delayMs = 3000) {
+        this.clearReconnectTimer();
+
+        this.reconnectTimer = window.setTimeout(() => {
+            this.reconnectTimer = null;
+
+            if (!this.isConnected && !this.isConnecting) {
+                this.logEvent('Connection', 'Retrying connection...');
+                this.connect();
+            }
+        }, delayMs);
+    }
+
     /**
      * Connect to the remote viewer
      */
     async connect() {
+        this.clearReconnectTimer();
+
         if (this.isConnecting || this.isConnected) return;
         
         this.isConnecting = true;
@@ -268,19 +306,21 @@ class RemoteViewer {
         } catch (error) {
             console.error('[RemoteViewer] Connection failed:', error);
             this.logEvent('Error', `Connection failed: ${error.message}`);
-            this.disconnect();
+            this.disconnect({ scheduleReconnect: true });
         }
     }
-    
+
     /**
      * Disconnect from the remote viewer
      */
-    disconnect() {
+    disconnect({ scheduleReconnect = false } = {}) {
         console.log('[RemoteViewer] Disconnecting...');
-        
+
         this.isConnected = false;
         this.isConnecting = false;
-        
+
+        this.clearReconnectTimer();
+
         // Close WebRTC
         if (this.peerConnection) {
             this.peerConnection.close();
@@ -295,9 +335,13 @@ class RemoteViewer {
         
         // Reset video
         this.elements.remoteVideo.srcObject = null;
-        
+
         this.updateUI();
         this.logEvent('Connection', 'Disconnected');
+
+        if (scheduleReconnect) {
+            this.scheduleReconnect();
+        }
     }
     
     /**
@@ -319,9 +363,11 @@ class RemoteViewer {
             
             this.websocket.onclose = () => {
                 console.log('[RemoteViewer] WebSocket closed');
-                if (this.isConnected) {
-                    this.disconnect();
+                if (!this.isConnected && !this.isConnecting) {
+                    return;
                 }
+
+                this.disconnect({ scheduleReconnect: true });
             };
             
             this.websocket.onerror = (error) => {
@@ -351,6 +397,8 @@ class RemoteViewer {
             console.log('[RemoteViewer] Received remote stream');
             this.elements.remoteVideo.srcObject = event.streams[0];
             this.isConnected = true;
+            this.isConnecting = false;
+            this.clearReconnectTimer();
             this.updateUI();
             this.logEvent('WebRTC', 'Video stream connected');
         };
@@ -371,10 +419,12 @@ class RemoteViewer {
             
             if (this.peerConnection.connectionState === 'connected') {
                 this.isConnected = true;
+                this.isConnecting = false;
+                this.clearReconnectTimer();
                 this.updateUI();
             } else if (this.peerConnection.connectionState === 'failed' || 
                        this.peerConnection.connectionState === 'closed') {
-                this.disconnect();
+                this.disconnect({ scheduleReconnect: true });
             }
         };
 
@@ -694,10 +744,6 @@ class RemoteViewer {
             statusElement.textContent = 'Disconnected';
             statusElement.className = 'status-disconnected';
         }
-        
-        // Buttons
-        this.elements.connectBtn.disabled = this.isConnecting || this.isConnected;
-        this.elements.disconnectBtn.disabled = !this.isConnecting && !this.isConnected;
         
         // Simulation controls
         const simControlsDisabled = !this.isConnected;

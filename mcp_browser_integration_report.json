@@ -1,9 +1,9 @@
 {
   "test_framework": "MuJoCo MCP Browser Integration Tests",
   "test_environment": {
-    "python_version": "Python 3.12.3",
+    "python_version": "Python 3.11.0",
     "platform": "posix",
-    "working_directory": "/home/runner/work/mujoco-mcp/mujoco-mcp"
+    "working_directory": "/Users/yskim/zordi_ws/mujoco-mcp"
   },
   "tests_run": [
     "Browser UI Structure",
