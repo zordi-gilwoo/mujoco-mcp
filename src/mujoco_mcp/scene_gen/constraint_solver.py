@@ -9,40 +9,33 @@ Implements greedy constraint satisfaction with collision avoidance.
 import logging
 import numpy as np
 from typing import Dict, List, Tuple, Optional, Set
-from dataclasses import dataclass
 
 from .scene_schema import SceneDescription, SpatialConstraint
 from .metadata_extractor import MetadataExtractor, AssetMetadata
+from .shared_types import Pose, AABBBox
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.constraint_solver")
 
-
-@dataclass
-class Pose:
-    """Represents a 3D pose with position and orientation."""
-    position: np.ndarray  # [x, y, z]
-    orientation: np.ndarray  # quaternion [x, y, z, w]
-    
-    def __post_init__(self):
-        """Ensure arrays are numpy arrays with correct shapes."""
-        self.position = np.array(self.position, dtype=float)
-        self.orientation = np.array(self.orientation, dtype=float)
-        
-        # Default orientation if not provided
-        if len(self.orientation) == 0:
-            self.orientation = np.array([0.0, 0.0, 0.0, 1.0])
+# Import enhanced collision detection for Phase 2A
+try:
+    from .enhanced_collision import GlobalCollisionOptimizer, RotationAwareAABB
+    ENHANCED_COLLISION_AVAILABLE = True
+    logger.info("Enhanced collision detection enabled (Phase 2A)")
+except ImportError:
+    ENHANCED_COLLISION_AVAILABLE = False
+    logger.warning("Enhanced collision detection not available - using basic collision")
 
 
-class AABBBox:
-    """Axis-aligned bounding box for collision detection."""
-    
-    def __init__(self, min_coords: np.ndarray, max_coords: np.ndarray):
-        self.min = np.array(min_coords, dtype=float)
-        self.max = np.array(max_coords, dtype=float)
+
     
     @classmethod
     def from_metadata(cls, metadata: AssetMetadata, pose: Pose) -> 'AABBBox':
         """Create AABB from asset metadata and pose."""
+        # Use enhanced collision detection if available (Phase 2A)
+        if ENHANCED_COLLISION_AVAILABLE:
+            return RotationAwareAABB.from_metadata(metadata, pose)
+        
+        # Original implementation for backward compatibility
         bbox_min, bbox_max = metadata.get_bounding_box()
         
         # Transform bounding box to world coordinates
@@ -98,6 +91,16 @@ class ConstraintSolver:
         self.metadata_extractor = metadata_extractor
         self.max_collision_iterations = 10
         self.collision_push_distance = 0.01  # meters
+        
+        # Initialize enhanced collision system if available (Phase 2A)
+        if ENHANCED_COLLISION_AVAILABLE:
+            self.collision_optimizer = GlobalCollisionOptimizer(metadata_extractor)
+            self.use_enhanced_collision = True
+            logger.info("Using enhanced collision detection and global optimization")
+        else:
+            self.collision_optimizer = None
+            self.use_enhanced_collision = False
+            logger.info("Using basic collision detection")
     
     def solve(self, scene: SceneDescription) -> Dict[str, Pose]:
         """
@@ -156,7 +159,14 @@ class ConstraintSolver:
             raise ValueError(f"Constraint solving incomplete. Unplaced entities: {unplaced}")
         
         # Phase 3: Resolve collisions
-        self._resolve_collisions(scene, poses)
+        if self.use_enhanced_collision and self.collision_optimizer:
+            # Use enhanced global collision optimization (Phase 2A)
+            logger.info("Applying enhanced collision resolution with global optimization")
+            poses = self.collision_optimizer.optimize_poses(scene, poses)
+        else:
+            # Use original collision resolution for backward compatibility
+            logger.info("Applying basic collision resolution")
+            self._resolve_collisions(scene, poses)
         
         logger.info(f"Successfully solved all constraints in {iteration} iterations")
         return poses

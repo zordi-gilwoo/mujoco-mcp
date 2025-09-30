@@ -16,7 +16,6 @@ import numpy as np
 from unittest.mock import Mock, patch
 from pathlib import Path
 
-# Import the modules to test
 from mujoco_mcp.scene_gen import (
     SceneDescription,
     SpatialConstraint,
@@ -25,9 +24,9 @@ from mujoco_mcp.scene_gen import (
     MetadataExtractor,
     ConstraintSolver,
     SceneXMLBuilder,
-    LLMSceneGenerator
+    LLMSceneGenerator,
+    Pose
 )
-from mujoco_mcp.scene_gen.constraint_solver import Pose
 from mujoco_mcp.scene_gen.metadata_extractor import AssetMetadata
 
 
