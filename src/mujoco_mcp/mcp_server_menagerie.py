@@ -320,6 +320,21 @@ async def handle_list_tools() -> List[types.Tool]:
                 },
                 "required": ["script_content"]
             }
+        ),
+        types.Tool(
+            name="list_uploaded_files",
+            description="List all uploaded files with metadata",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_type": {
+                        "type": "string",
+                        "description": "Filter by file type (xml, python)",
+                        "enum": ["xml", "python"]
+                    }
+                },
+                "required": []
+            }
         )
     ]
 
@@ -526,7 +541,7 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                         "create_scene", "create_menagerie_scene", "list_menagerie_models",
                         "validate_menagerie_model", "step_simulation", "get_state", 
                         "reset", "close_viewer", "download_xml", "download_python_script",
-                        "upload_xml", "upload_python_script"
+                        "upload_xml", "upload_python_script", "list_uploaded_files"
                     ],
                     "menagerie_support": True
                 }, indent=2)
@@ -1390,6 +1405,35 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                 return [types.TextContent(
                     type="text",
                     text=f"❌ Failed to upload Python script: {str(e)}"
+                )]
+        
+        elif name == "list_uploaded_files":
+            file_type = arguments.get("file_type")
+            
+            try:
+                files_info = file_handler.list_uploaded_files()
+                
+                # Filter by file type if specified
+                if file_type:
+                    filtered_files = [
+                        f for f in files_info["files"] 
+                        if f["type"] == file_type
+                    ]
+                    files_info = {
+                        "total_files": len(filtered_files),
+                        "files": filtered_files,
+                        "filter": f"type={file_type}"
+                    }
+                
+                return [types.TextContent(
+                    type="text",
+                    text=f"📁 Uploaded Files\n{json.dumps(files_info, indent=2)}"
+                )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to list uploaded files: {str(e)}"
                 )]
         
         elif name == "execute_command":
