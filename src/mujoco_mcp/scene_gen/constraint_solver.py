@@ -43,6 +43,15 @@ except ImportError:
     ENHANCED_SEMANTICS_AVAILABLE = False
     logger.warning("Enhanced asset semantics not available")
 
+# Import robust solver for Phase 2E
+try:
+    from .robust_solver import RobustConstraintSolver
+    ROBUST_SOLVER_AVAILABLE = True
+    logger.info("Robust constraint solver enabled (Phase 2E)")
+except ImportError:
+    ROBUST_SOLVER_AVAILABLE = False
+    logger.warning("Robust constraint solver not available")
+
 
 
     
@@ -139,10 +148,22 @@ class ConstraintSolver:
             self.enhanced_asset_db = None
             self.use_enhanced_semantics = False
             logger.info("Using basic asset semantics")
+        
+        # Initialize robust solver if available (Phase 2E)
+        if ROBUST_SOLVER_AVAILABLE:
+            self.robust_solver = RobustConstraintSolver(metadata_extractor)
+            self.use_robust_solver = True
+            logger.info("Using robust constraint solver with backtracking and global optimization")
+        else:
+            self.robust_solver = None
+            self.use_robust_solver = False
+            logger.info("Using basic constraint solver")
     
     def solve(self, scene: SceneDescription) -> Dict[str, Pose]:
         """
         Solve all constraints in the scene and return entity poses.
+        
+        Phase 2E Enhancement: Automatically uses robust solver for complex constraint scenarios.
         
         Args:
             scene: Scene description with objects, robots, and constraints
@@ -158,6 +179,85 @@ class ConstraintSolver:
         all_entities = scene.get_all_entity_ids()
         
         logger.info(f"Solving constraints for {len(all_entities)} entities")
+        
+        # Phase 2E: Decide whether to use robust solver
+        if self.use_robust_solver and self._should_use_robust_solver(scene):
+            logger.info("Complex constraints detected - using robust solver with backtracking")
+            robust_poses, solution_info = self.robust_solver.solve_robust(scene)
+            
+            # Log solution details
+            logger.info(f"Robust solver result: score={solution_info.get('final_score', 0):.3f}, "
+                       f"nodes_explored={solution_info.get('search_nodes_explored', 0)}, "
+                       f"backtracks={solution_info.get('backtrack_events', 0)}")
+            
+            if solution_info.get('conflicts_detected'):
+                logger.warning(f"Detected {len(solution_info['conflicts_detected'])} constraint conflicts")
+                for conflict in solution_info['conflicts_detected']:
+                    logger.warning(f"  - {conflict['type']}: {conflict['description']}")
+            
+            if robust_poses:
+                return robust_poses
+            else:
+                logger.warning("Robust solver failed, falling back to basic solver")
+        
+        # Use original solving approach (Phase 1 implementation)
+        return self._solve_basic(scene)
+    
+    def _should_use_robust_solver(self, scene: SceneDescription) -> bool:
+        """Determine if robust solver should be used based on constraint complexity."""
+        if not self.robust_solver:
+            return False
+        
+        # Count total constraints and detect complexity indicators
+        total_constraints = 0
+        spatial_constraints = 0
+        collision_constraints = 0
+        multi_constraint_entities = 0
+        
+        for entity_id in scene.get_all_entity_ids():
+            constraints = scene.get_constraints_for_entity(entity_id)
+            total_constraints += len(constraints)
+            
+            entity_spatial = 0
+            entity_collision = 0
+            
+            for constraint in constraints:
+                if constraint.type in ["on_top_of", "in_front_of", "beside", "inside", "aligned_with_axis", "within_reach"]:
+                    spatial_constraints += 1
+                    entity_spatial += 1
+                elif constraint.type == "no_collision":
+                    collision_constraints += 1
+                    entity_collision += 1
+            
+            if entity_spatial + entity_collision > 2:
+                multi_constraint_entities += 1
+        
+        # Use robust solver for complex scenarios
+        complexity_indicators = [
+            total_constraints > 8,  # Many constraints overall
+            multi_constraint_entities > 2,  # Multiple entities with many constraints
+            collision_constraints > 3,  # Many collision constraints
+            len(scene.get_all_entity_ids()) > 5  # Many entities
+        ]
+        
+        use_robust = sum(complexity_indicators) >= 2
+        
+        if use_robust:
+            logger.info(f"Triggering robust solver: constraints={total_constraints}, "
+                       f"multi_constrained_entities={multi_constraint_entities}, "
+                       f"collision_constraints={collision_constraints}")
+        
+        return use_robust
+    
+    def _solve_basic(self, scene: SceneDescription) -> Dict[str, Pose]:
+        """
+        Basic constraint solving approach (original implementation).
+        """
+        poses: Dict[str, Pose] = {}
+        placed_entities: Set[str] = set()
+        all_entities = scene.get_all_entity_ids()
+        
+        logger.info(f"Using basic constraint solver for {len(all_entities)} entities")
         
         # Phase 1: Place unconstrained entities (typically tables/anchor objects)
         self._place_unconstrained_entities(scene, poses, placed_entities)

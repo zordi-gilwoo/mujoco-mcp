@@ -113,6 +113,25 @@ try:
 except ImportError:
     _enhanced_semantics_exports = []
 
+# Phase 2E: Robust constraint solver (optional import)
+try:
+    from .robust_solver import (
+        RobustConstraintSolver,
+        ConstraintConflict,
+        PlacementSolution,
+        GlobalSceneState,
+        ConstraintConflictType
+    )
+    _robust_solver_exports = [
+        "RobustConstraintSolver",
+        "ConstraintConflict",
+        "PlacementSolution", 
+        "GlobalSceneState",
+        "ConstraintConflictType"
+    ]
+except ImportError:
+    _robust_solver_exports = []
+
 __all__ = [
     "SpatialConstraint",
     "ObjectPlacement", 
@@ -124,4 +143,4 @@ __all__ = [
     "ConstraintSolver",
     "SceneXMLBuilder", 
     "LLMSceneGenerator",
-] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports + _enhanced_semantics_exports
+] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports + _enhanced_semantics_exports + _robust_solver_exports
