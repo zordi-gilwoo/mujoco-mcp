@@ -17,26 +17,22 @@ from mujoco_mcp.scene_gen import (
     LLMSceneGenerator
 )
 
-# Try to import symbolic plan components
-try:
-    from mujoco_mcp.scene_gen.symbolic_plan import (
-        SymbolicPlan,
-        SymbolicOperation,
-        SymbolicPlanGenerator,
-        PlanToSceneConverter,
-        PlanValidator,
-        OperationType,
-        ConstraintCategory
-    )
-    SYMBOLIC_PLAN_AVAILABLE = True
-except ImportError:
-    SYMBOLIC_PLAN_AVAILABLE = False
+# Import symbolic plan components
+from mujoco_mcp.scene_gen.symbolic_plan import (
+    SymbolicPlan,
+    SymbolicOperation,
+    SymbolicPlanGenerator,
+    PlanToSceneConverter,
+    PlanValidator,
+    OperationType,
+    ConstraintCategory
+)
 
 
 class TestSymbolicOperation:
     """Test symbolic operation creation and manipulation."""
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_symbolic_operation_creation(self):
         """Test creating and converting symbolic operations."""
         op = SymbolicOperation(
@@ -71,7 +67,7 @@ class TestSymbolicOperation:
 class TestSymbolicPlan:
     """Test symbolic plan creation and manipulation."""
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_symbolic_plan_creation(self):
         """Test creating and manipulating symbolic plans."""
         plan = SymbolicPlan(
@@ -125,14 +121,14 @@ class TestPlanValidator:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_plan_validator_creation(self):
         """Test that plan validator can be created."""
         validator = PlanValidator(self.metadata_extractor)
         assert validator is not None
         assert hasattr(validator, 'metadata_extractor')
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_valid_plan_validation(self):
         """Test validation of a valid plan."""
         validator = PlanValidator(self.metadata_extractor)
@@ -170,7 +166,7 @@ class TestPlanValidator:
         assert "dependency_check" in details
         assert "constraint_consistency" in details
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_invalid_plan_validation(self):
         """Test validation of an invalid plan."""
         validator = PlanValidator(self.metadata_extractor)
@@ -202,7 +198,7 @@ class TestPlanValidator:
         # Should detect circular dependency
         assert any("circular" in error.lower() for error in errors)
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_unknown_entity_validation(self):
         """Test validation with unknown object types."""
         validator = PlanValidator(self.metadata_extractor)
@@ -231,14 +227,14 @@ class TestSymbolicPlanGenerator:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_plan_generator_creation(self):
         """Test that plan generator can be created."""
         generator = SymbolicPlanGenerator(self.metadata_extractor)
         assert generator is not None
         assert hasattr(generator, 'validator')
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_simple_plan_generation(self):
         """Test generating plans from simple natural language."""
         generator = SymbolicPlanGenerator(self.metadata_extractor)
@@ -261,7 +257,7 @@ class TestSymbolicPlanGenerator:
         assert "validation_results" in plan.__dict__
         assert "is_valid" in plan.validation_results
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_robot_plan_generation(self):
         """Test generating plans with robots."""
         generator = SymbolicPlanGenerator(self.metadata_extractor)
@@ -280,7 +276,7 @@ class TestSymbolicPlanGenerator:
             robot_op = robot_ops[0]
             assert "robot_type" in robot_op.parameters
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_complex_plan_generation(self):
         """Test generating complex plans with multiple constraints."""
         generator = SymbolicPlanGenerator(self.metadata_extractor)
@@ -305,13 +301,13 @@ class TestPlanToSceneConverter:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_converter_creation(self):
         """Test that plan to scene converter can be created."""
         converter = PlanToSceneConverter(self.metadata_extractor)
         assert converter is not None
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_simple_plan_conversion(self):
         """Test converting a simple plan to scene description."""
         converter = PlanToSceneConverter(self.metadata_extractor)
@@ -358,7 +354,7 @@ class TestPlanToSceneConverter:
         assert len(cup_obj.constraints) == 1
         assert cup_obj.constraints[0].type == "on_top_of"
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_robot_plan_conversion(self):
         """Test converting plans with robots."""
         converter = PlanToSceneConverter(self.metadata_extractor)
@@ -395,33 +391,28 @@ class TestLLMGeneratorWithSymbolicPlans:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_llm_generator_with_symbolic_plans(self):
-        """Test that LLM generator can use symbolic plans."""
+        """Test that LLM generator uses symbolic plans."""
         generator = LLMSceneGenerator(self.metadata_extractor)
         
         # Should have symbolic plan capabilities
-        assert hasattr(generator, 'use_symbolic_plans')
-        
-        if SYMBOLIC_PLAN_AVAILABLE:
-            assert generator.use_symbolic_plans == True
-            assert generator.plan_generator is not None
-            assert generator.plan_converter is not None
+        assert generator.plan_generator is not None
+        assert generator.plan_converter is not None
     
-    @pytest.mark.skipif(not SYMBOLIC_PLAN_AVAILABLE, reason="Symbolic plan not available")
+    
     def test_scene_generation_with_symbolic_plans(self):
         """Test scene generation using symbolic plan pipeline."""
         generator = LLMSceneGenerator(self.metadata_extractor)
         
-        if generator.use_symbolic_plans:
-            scene = generator.generate_scene_description("Create a table with a cup on top")
-            
-            assert isinstance(scene, SceneDescription)
-            assert len(scene.objects) > 0
-            
-            # Should have created meaningful objects
-            object_types = {obj.object_type for obj in scene.objects}
-            # Basic validation that some objects were created
+        scene = generator.generate_scene_description("Create a table with a cup on top")
+        
+        assert isinstance(scene, SceneDescription)
+        assert len(scene.objects) > 0
+        
+        # Should have created meaningful objects
+        object_types = {obj.object_type for obj in scene.objects}
+        # Basic validation that some objects were created
             assert len(object_types) > 0
 
 

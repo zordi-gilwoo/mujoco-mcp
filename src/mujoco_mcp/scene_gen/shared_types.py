@@ -34,16 +34,10 @@ class AABBBox:
     
     @classmethod
     def from_metadata(cls, metadata, pose: Pose) -> 'AABBBox':
-        """Create AABB from asset metadata and pose."""
-        bbox_min, bbox_max = metadata.get_bounding_box()
-        
-        # Transform bounding box to world coordinates
-        # Note: This is a simplified transform that only considers translation
-        # Full implementation would handle rotation as well
-        world_min = np.array(bbox_min) + pose.position
-        world_max = np.array(bbox_max) + pose.position
-        
-        return cls(world_min, world_max)
+        """Create AABB from asset metadata and pose using enhanced collision detection."""
+        # Always use enhanced rotation-aware AABB
+        from .enhanced_collision import RotationAwareAABB
+        return RotationAwareAABB.from_metadata(metadata, pose)
     
     def overlaps(self, other: 'AABBBox') -> bool:
         """Check if this AABB overlaps with another."""

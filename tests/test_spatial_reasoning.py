@@ -20,25 +20,21 @@ from mujoco_mcp.scene_gen import (
     Pose
 )
 
-# Try to import spatial reasoning components
-try:
-    from mujoco_mcp.scene_gen.spatial_reasoning import (
-        AdvancedSpatialReasoner,
-        StablePoseDatabase,
-        RobotReachabilityChecker,
-        StablePose,
-        WorkspaceVolume,
-        SupportSurface
-    )
-    SPATIAL_REASONING_AVAILABLE = True
-except ImportError:
-    SPATIAL_REASONING_AVAILABLE = False
+# Import spatial reasoning components
+from mujoco_mcp.scene_gen.spatial_reasoning import (
+    AdvancedSpatialReasoner,
+    StablePoseDatabase,
+    RobotReachabilityChecker,
+    StablePose,
+    WorkspaceVolume,
+    SupportSurface
+)
 
 
 class TestStablePoseDatabase:
     """Test stable pose database functionality."""
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_stable_pose_database_creation(self):
         """Test that stable pose database can be created and has default poses."""
         db = StablePoseDatabase()
@@ -50,7 +46,7 @@ class TestStablePoseDatabase:
         assert "cup_ceramic_small" in db.stable_poses
         assert "box_small" in db.stable_poses
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_stable_pose_retrieval(self):
         """Test retrieval of stable poses with filtering."""
         db = StablePoseDatabase()
@@ -69,7 +65,7 @@ class TestStablePoseDatabase:
         stable_poses = db.get_stable_poses("cup_ceramic_small", min_stability=0.8)
         assert all(pose.stability_score >= 0.8 for pose in stable_poses)
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_stable_pose_sampling(self):
         """Test stable pose sampling with weighting."""
         db = StablePoseDatabase()
@@ -85,7 +81,7 @@ class TestStablePoseDatabase:
         assert all(isinstance(pose, StablePose) for pose in samples)
         assert all(pose.stability_score >= 0.5 for pose in samples)
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_add_custom_stable_pose(self):
         """Test adding custom stable poses."""
         db = StablePoseDatabase()
@@ -111,7 +107,7 @@ class TestStablePoseDatabase:
 class TestWorkspaceVolume:
     """Test workspace volume functionality."""
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_workspace_volume_creation(self):
         """Test workspace volume creation and basic properties."""
         workspace = WorkspaceVolume(
@@ -127,7 +123,7 @@ class TestWorkspaceVolume:
         assert workspace.get_volume() == 1.0  # 1x1x1 cube
         np.testing.assert_array_equal(workspace.center, [0.5, 0, 0.5])
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_workspace_point_containment(self):
         """Test point containment checking."""
         workspace = WorkspaceVolume(
@@ -156,7 +152,7 @@ class TestRobotReachabilityChecker:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_reachability_checker_creation(self):
         """Test that reachability checker can be created."""
         checker = RobotReachabilityChecker(self.metadata_extractor)
@@ -164,7 +160,7 @@ class TestRobotReachabilityChecker:
         assert hasattr(checker, 'robot_specs')
         assert "franka_panda" in checker.robot_specs
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_reachability_checking(self):
         """Test basic reachability checking."""
         checker = RobotReachabilityChecker(self.metadata_extractor)
@@ -192,7 +188,7 @@ class TestRobotReachabilityChecker:
         assert reachable == False
         assert score == 0.0
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_optimal_base_position_finding(self):
         """Test finding optimal robot base position."""
         checker = RobotReachabilityChecker(self.metadata_extractor)
@@ -236,7 +232,7 @@ class TestAdvancedSpatialReasoner:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_spatial_reasoner_creation(self):
         """Test that spatial reasoner can be created."""
         reasoner = AdvancedSpatialReasoner(self.metadata_extractor)
@@ -244,7 +240,7 @@ class TestAdvancedSpatialReasoner:
         assert hasattr(reasoner, 'stable_pose_db')
         assert hasattr(reasoner, 'reachability_checker')
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_enhanced_object_placement(self):
         """Test enhanced object placement with stable poses."""
         reasoner = AdvancedSpatialReasoner(self.metadata_extractor)
@@ -275,7 +271,7 @@ class TestAdvancedSpatialReasoner:
         # Enhanced pose should be above the support surface
         assert enhanced_pose.position[2] > support_pose.position[2]
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_workspace_validation(self):
         """Test workspace validation for robots."""
         reasoner = AdvancedSpatialReasoner(self.metadata_extractor)
@@ -387,15 +383,12 @@ class TestEnhancedConstraintTypes:
         distance = np.linalg.norm(cup_pos - robot_pos)
         assert 0.1 < distance < 1.0  # Reasonable manipulation distance
     
-    @pytest.mark.skipif(not SPATIAL_REASONING_AVAILABLE, reason="Spatial reasoning not available")
+    
     def test_enhanced_solver_integration(self):
-        """Test that enhanced solver uses spatial reasoning when available."""
-        # Should have spatial reasoning available if the module imported successfully
-        if SPATIAL_REASONING_AVAILABLE:
-            assert hasattr(self.solver, 'use_spatial_reasoning')
-            assert hasattr(self.solver, 'spatial_reasoner')
-            assert self.solver.use_spatial_reasoning is True
-            assert self.solver.spatial_reasoner is not None
+        """Test that enhanced solver uses spatial reasoning."""
+        # Should have spatial reasoning available
+        assert hasattr(self.solver, 'spatial_reasoner')
+        assert self.solver.spatial_reasoner is not None
 
 
 if __name__ == "__main__":

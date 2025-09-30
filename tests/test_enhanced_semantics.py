@@ -15,28 +15,24 @@ from mujoco_mcp.scene_gen import (
     ConstraintSolver
 )
 
-# Try to import enhanced semantics components
-try:
-    from mujoco_mcp.scene_gen.enhanced_semantics import (
-        EnhancedAssetMetadata,
-        EnhancedAssetDatabase,
-        GraspAffordance,
-        SupportSurfaceInfo,
-        WorkspaceEnvelope,
-        RobotMountingRule,
-        AssetCategory,
-        GraspType,
-        SurfaceType
-    )
-    ENHANCED_SEMANTICS_AVAILABLE = True
-except ImportError:
-    ENHANCED_SEMANTICS_AVAILABLE = False
+# Import enhanced semantics components
+from mujoco_mcp.scene_gen.enhanced_semantics import (
+    EnhancedAssetMetadata,
+    EnhancedAssetDatabase,
+    GraspAffordance,
+    SupportSurfaceInfo,
+    WorkspaceEnvelope,
+    RobotMountingRule,
+    AssetCategory,
+    GraspType,
+    SurfaceType
+)
 
 
 class TestGraspAffordance:
     """Test grasp affordance functionality."""
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_grasp_affordance_creation(self):
         """Test creating grasp affordances."""
         grasp = GraspAffordance(
@@ -62,7 +58,7 @@ class TestGraspAffordance:
 class TestSupportSurfaceInfo:
     """Test support surface information."""
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_support_surface_creation(self):
         """Test creating support surface information."""
         surface = SupportSurfaceInfo(
@@ -90,7 +86,7 @@ class TestSupportSurfaceInfo:
 class TestWorkspaceEnvelope:
     """Test workspace envelope functionality."""
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_workspace_envelope_creation(self):
         """Test creating workspace envelopes."""
         workspace = WorkspaceEnvelope(
@@ -115,7 +111,7 @@ class TestWorkspaceEnvelope:
 class TestEnhancedAssetMetadata:
     """Test enhanced asset metadata functionality."""
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_enhanced_metadata_creation(self):
         """Test creating enhanced asset metadata."""
         # Create grasp affordance
@@ -159,7 +155,7 @@ class TestEnhancedAssetMetadata:
         assert len(metadata.grasp_affordances) == 1
         assert len(metadata.support_surfaces) == 1
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_grasp_affordance_queries(self):
         """Test querying grasp affordances."""
         # Create multiple grasp affordances
@@ -209,7 +205,7 @@ class TestEnhancedAssetMetadata:
         # Test graspability
         assert metadata.is_graspable() == True
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_support_surface_queries(self):
         """Test querying support surfaces."""
         # Create support surface
@@ -249,7 +245,7 @@ class TestEnhancedAssetMetadata:
 class TestEnhancedAssetDatabase:
     """Test enhanced asset database functionality."""
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_database_creation(self):
         """Test creating enhanced asset database."""
         # This should work with default assets even if file doesn't exist
@@ -258,7 +254,7 @@ class TestEnhancedAssetDatabase:
         assert hasattr(db, 'enhanced_assets')
         assert len(db.enhanced_assets) > 0
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_asset_retrieval(self):
         """Test retrieving assets from database."""
         db = EnhancedAssetDatabase()
@@ -284,7 +280,7 @@ class TestEnhancedAssetDatabase:
         assert len(support_assets) > 0
         assert all(asset.is_support_surface() for asset in support_assets)
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_compatibility_queries(self):
         """Test finding compatible support surfaces."""
         db = EnhancedAssetDatabase()
@@ -311,14 +307,11 @@ class TestEnhancedConstraintSolver:
         self.metadata_extractor = MetadataExtractor()
         self.solver = ConstraintSolver(self.metadata_extractor)
     
-    @pytest.mark.skipif(not ENHANCED_SEMANTICS_AVAILABLE, reason="Enhanced semantics not available")
+    
     def test_enhanced_semantics_integration(self):
         """Test that enhanced semantics is integrated with constraint solver."""
-        if ENHANCED_SEMANTICS_AVAILABLE:
-            assert hasattr(self.solver, 'use_enhanced_semantics')
-            assert hasattr(self.solver, 'enhanced_asset_db')
-            assert self.solver.use_enhanced_semantics == True
-            assert self.solver.enhanced_asset_db is not None
+        assert hasattr(self.solver, 'enhanced_asset_db')
+        assert self.solver.enhanced_asset_db is not None
 
 
 if __name__ == "__main__":

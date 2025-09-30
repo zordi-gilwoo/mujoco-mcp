@@ -14,24 +14,16 @@ import os
 from typing import Dict, Any, Optional
 
 from .scene_schema import SceneDescription
+from .symbolic_plan import SymbolicPlanGenerator, PlanToSceneConverter
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.llm_generator")
-
-# Phase 2C: Import symbolic plan interface
-try:
-    from .symbolic_plan import SymbolicPlanGenerator, PlanToSceneConverter
-    SYMBOLIC_PLAN_AVAILABLE = True
-    logger.info("Symbolic plan interface available (Phase 2C)")
-except ImportError:
-    SYMBOLIC_PLAN_AVAILABLE = False
-    logger.warning("Symbolic plan interface not available")
 
 
 class LLMSceneGenerator:
     """
-    Generates scene descriptions from natural language using LLM integration.
+    Generates scene descriptions from natural language using enhanced pipeline.
     
-    Phase 2C Enhancement: Now supports symbolic plan generation as intermediate step,
+    Always uses symbolic plan generation as intermediate step (Phase 2C),
     providing explicit NL→Plan→Scene separation for better auditability.
     
     By default, returns canned examples. Real LLM integration can be enabled
@@ -45,24 +37,19 @@ class LLMSceneGenerator:
         else:
             logger.info("LLM integration disabled - using canned examples")
         
-        # Phase 2C: Initialize symbolic plan generator if available
-        if SYMBOLIC_PLAN_AVAILABLE and metadata_extractor:
+        # Always initialize symbolic plan generator (Phase 2C)
+        if metadata_extractor:
             self.plan_generator = SymbolicPlanGenerator(metadata_extractor)
             self.plan_converter = PlanToSceneConverter(metadata_extractor)
-            self.use_symbolic_plans = True
-            logger.info("Using symbolic plan interface for NL→Plan→Scene pipeline")
+            logger.info("Symbolic plan interface initialized for NL→Plan→Scene pipeline")
         else:
-            self.plan_generator = None
-            self.plan_converter = None
-            self.use_symbolic_plans = False
-            logger.info("Using direct NL→Scene pipeline")
+            raise ValueError("MetadataExtractor is required for enhanced scene generation")
     
     def generate_scene_description(self, prompt: str) -> SceneDescription:
         """
         Generate a scene description from natural language prompt.
         
-        Phase 2C Enhancement: Uses symbolic plan interface when available for
-        explicit NL→Plan→Scene separation.
+        Always uses symbolic plan interface (Phase 2C) for explicit NL→Plan→Scene separation.
         
         Args:
             prompt: Natural language description of desired scene
@@ -73,12 +60,7 @@ class LLMSceneGenerator:
         Raises:
             NotImplementedError: If LLM integration is enabled but not implemented
         """
-        if self.use_symbolic_plans:
-            return self._generate_with_symbolic_plan(prompt)
-        elif self.llm_enabled:
-            return self._generate_with_llm(prompt)
-        else:
-            return self._generate_canned_example(prompt)
+        return self._generate_with_symbolic_plan(prompt)
     
     def _generate_with_symbolic_plan(self, prompt: str) -> SceneDescription:
         """

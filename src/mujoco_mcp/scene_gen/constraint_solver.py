@@ -13,105 +13,25 @@ from typing import Dict, List, Tuple, Optional, Set
 from .scene_schema import SceneDescription, SpatialConstraint
 from .metadata_extractor import MetadataExtractor, AssetMetadata
 from .shared_types import Pose, AABBBox
+from .enhanced_collision import GlobalCollisionOptimizer, RotationAwareAABB
+from .spatial_reasoning import AdvancedSpatialReasoner
+from .enhanced_semantics import EnhancedAssetDatabase
+from .robust_solver import RobustConstraintSolver
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.constraint_solver")
-
-# Import enhanced collision detection for Phase 2A
-try:
-    from .enhanced_collision import GlobalCollisionOptimizer, RotationAwareAABB
-    ENHANCED_COLLISION_AVAILABLE = True
-    logger.info("Enhanced collision detection enabled (Phase 2A)")
-except ImportError:
-    ENHANCED_COLLISION_AVAILABLE = False
-    logger.warning("Enhanced collision detection not available - using basic collision")
-
-# Import advanced spatial reasoning for Phase 2B
-try:
-    from .spatial_reasoning import AdvancedSpatialReasoner
-    SPATIAL_REASONING_AVAILABLE = True
-    logger.info("Advanced spatial reasoning enabled (Phase 2B)")
-except ImportError:
-    SPATIAL_REASONING_AVAILABLE = False
-    logger.warning("Advanced spatial reasoning not available")
-
-# Import enhanced semantics for Phase 2D
-try:
-    from .enhanced_semantics import EnhancedAssetDatabase
-    ENHANCED_SEMANTICS_AVAILABLE = True
-    logger.info("Enhanced asset semantics enabled (Phase 2D)")
-except ImportError:
-    ENHANCED_SEMANTICS_AVAILABLE = False
-    logger.warning("Enhanced asset semantics not available")
-
-# Import robust solver for Phase 2E
-try:
-    from .robust_solver import RobustConstraintSolver
-    ROBUST_SOLVER_AVAILABLE = True
-    logger.info("Robust constraint solver enabled (Phase 2E)")
-except ImportError:
-    ROBUST_SOLVER_AVAILABLE = False
-    logger.warning("Robust constraint solver not available")
-
-
-
-    
-    @classmethod
-    def from_metadata(cls, metadata: AssetMetadata, pose: Pose) -> 'AABBBox':
-        """Create AABB from asset metadata and pose."""
-        # Use enhanced collision detection if available (Phase 2A)
-        if ENHANCED_COLLISION_AVAILABLE:
-            return RotationAwareAABB.from_metadata(metadata, pose)
-        
-        # Original implementation for backward compatibility
-        bbox_min, bbox_max = metadata.get_bounding_box()
-        
-        # Transform bounding box to world coordinates
-        # Note: This is a simplified transform that only considers translation
-        # Full implementation would handle rotation as well
-        world_min = np.array(bbox_min) + pose.position
-        world_max = np.array(bbox_max) + pose.position
-        
-        return cls(world_min, world_max)
-    
-    def overlaps(self, other: 'AABBBox') -> bool:
-        """Check if this AABB overlaps with another."""
-        return np.all(self.min <= other.max) and np.all(self.max >= other.min)
-    
-    def separation_vector(self, other: 'AABBBox') -> np.ndarray:
-        """Calculate minimum separation vector to resolve overlap."""
-        if not self.overlaps(other):
-            return np.zeros(3)
-        
-        # Calculate overlap in each axis
-        overlap_x = min(self.max[0] - other.min[0], other.max[0] - self.min[0])
-        overlap_y = min(self.max[1] - other.min[1], other.max[1] - self.min[1])
-        overlap_z = min(self.max[2] - other.min[2], other.max[2] - self.min[2])
-        
-        # Find minimum overlap axis
-        min_overlap = min(overlap_x, overlap_y, overlap_z)
-        
-        if min_overlap == overlap_x:
-            # Separate along X axis
-            direction = 1 if self.min[0] < other.min[0] else -1
-            return np.array([direction * overlap_x, 0, 0])
-        elif min_overlap == overlap_y:
-            # Separate along Y axis
-            direction = 1 if self.min[1] < other.min[1] else -1
-            return np.array([0, direction * overlap_y, 0])
-        else:
-            # Separate along Z axis
-            direction = 1 if self.min[2] < other.min[2] else -1
-            return np.array([0, 0, direction * overlap_z])
 
 
 class ConstraintSolver:
     """
-    Solves spatial constraints to determine object placements.
+    Enhanced constraint solver with collision detection, spatial reasoning, 
+    asset semantics, and robust solving capabilities.
     
-    Uses a greedy approach:
-    1. Place unconstrained objects at origin/specified positions
-    2. Iteratively place constrained objects when their references are placed
-    3. Apply collision resolution for no_collision constraints
+    Integrates all Phase 2A-2E enhancements:
+    - Phase 2A: Enhanced collision detection with rotation-aware AABB
+    - Phase 2B: Advanced spatial reasoning with stable poses and reachability
+    - Phase 2C: Symbolic plan interface (via LLMSceneGenerator)
+    - Phase 2D: Enhanced asset semantics with rich metadata
+    - Phase 2E: Robust constraint solver with backtracking
     """
     
     def __init__(self, metadata_extractor: MetadataExtractor):
@@ -119,51 +39,23 @@ class ConstraintSolver:
         self.max_collision_iterations = 10
         self.collision_push_distance = 0.01  # meters
         
-        # Initialize enhanced collision system if available (Phase 2A)
-        if ENHANCED_COLLISION_AVAILABLE:
-            self.collision_optimizer = GlobalCollisionOptimizer(metadata_extractor)
-            self.use_enhanced_collision = True
-            logger.info("Using enhanced collision detection and global optimization")
-        else:
-            self.collision_optimizer = None
-            self.use_enhanced_collision = False
-            logger.info("Using basic collision detection")
+        # Initialize all enhanced systems (always available)
+        self.collision_optimizer = GlobalCollisionOptimizer(metadata_extractor)
+        self.spatial_reasoner = AdvancedSpatialReasoner(metadata_extractor)
+        self.enhanced_asset_db = EnhancedAssetDatabase()
+        self.robust_solver = RobustConstraintSolver(metadata_extractor)
         
-        # Initialize advanced spatial reasoning if available (Phase 2B)
-        if SPATIAL_REASONING_AVAILABLE:
-            self.spatial_reasoner = AdvancedSpatialReasoner(metadata_extractor)
-            self.use_spatial_reasoning = True
-            logger.info("Using advanced spatial reasoning for stable poses and reachability")
-        else:
-            self.spatial_reasoner = None
-            self.use_spatial_reasoning = False
-            logger.info("Using basic spatial reasoning")
-        
-        # Initialize enhanced semantics if available (Phase 2D)
-        if ENHANCED_SEMANTICS_AVAILABLE:
-            self.enhanced_asset_db = EnhancedAssetDatabase()
-            self.use_enhanced_semantics = True
-            logger.info("Using enhanced asset semantics for grasp sites and support surfaces")
-        else:
-            self.enhanced_asset_db = None
-            self.use_enhanced_semantics = False
-            logger.info("Using basic asset semantics")
-        
-        # Initialize robust solver if available (Phase 2E)
-        if ROBUST_SOLVER_AVAILABLE:
-            self.robust_solver = RobustConstraintSolver(metadata_extractor)
-            self.use_robust_solver = True
-            logger.info("Using robust constraint solver with backtracking and global optimization")
-        else:
-            self.robust_solver = None
-            self.use_robust_solver = False
-            logger.info("Using basic constraint solver")
+        logger.info("Enhanced constraint solver initialized with all Phase 2A-2E features")
     
     def solve(self, scene: SceneDescription) -> Dict[str, Pose]:
         """
-        Solve all constraints in the scene and return entity poses.
+        Solve all constraints in the scene using enhanced constraint solver.
         
-        Phase 2E Enhancement: Automatically uses robust solver for complex constraint scenarios.
+        Uses the comprehensive Phase 2A-2E pipeline:
+        1. Analyze constraint complexity and detect conflicts
+        2. Use robust solver for complex scenarios, enhanced solver for simple ones
+        3. Apply global collision optimization
+        4. Enhance poses with spatial reasoning
         
         Args:
             scene: Scene description with objects, robots, and constraints
@@ -174,14 +66,11 @@ class ConstraintSolver:
         Raises:
             ValueError: If constraints cannot be satisfied
         """
-        poses: Dict[str, Pose] = {}
-        placed_entities: Set[str] = set()
         all_entities = scene.get_all_entity_ids()
+        logger.info(f"Solving constraints for {len(all_entities)} entities using enhanced system")
         
-        logger.info(f"Solving constraints for {len(all_entities)} entities")
-        
-        # Phase 2E: Decide whether to use robust solver
-        if self.use_robust_solver and self._should_use_robust_solver(scene):
+        # Decide whether to use robust solver based on constraint complexity
+        if self._should_use_robust_solver(scene):
             logger.info("Complex constraints detected - using robust solver with backtracking")
             robust_poses, solution_info = self.robust_solver.solve_robust(scene)
             
@@ -198,16 +87,13 @@ class ConstraintSolver:
             if robust_poses:
                 return robust_poses
             else:
-                logger.warning("Robust solver failed, falling back to basic solver")
+                logger.warning("Robust solver failed, falling back to enhanced basic solver")
         
-        # Use original solving approach (Phase 1 implementation)
-        return self._solve_basic(scene)
+        # Use enhanced solving approach with all Phase 2A-2D features
+        return self._solve_enhanced(scene)
     
     def _should_use_robust_solver(self, scene: SceneDescription) -> bool:
         """Determine if robust solver should be used based on constraint complexity."""
-        if not self.robust_solver:
-            return False
-        
         # Count total constraints and detect complexity indicators
         total_constraints = 0
         spatial_constraints = 0
@@ -249,15 +135,15 @@ class ConstraintSolver:
         
         return use_robust
     
-    def _solve_basic(self, scene: SceneDescription) -> Dict[str, Pose]:
+    def _solve_enhanced(self, scene: SceneDescription) -> Dict[str, Pose]:
         """
-        Basic constraint solving approach (original implementation).
+        Enhanced constraint solving approach with all Phase 2A-2D features.
         """
         poses: Dict[str, Pose] = {}
         placed_entities: Set[str] = set()
         all_entities = scene.get_all_entity_ids()
         
-        logger.info(f"Using basic constraint solver for {len(all_entities)} entities")
+        logger.info(f"Using enhanced constraint solver for {len(all_entities)} entities")
         
         # Phase 1: Place unconstrained entities (typically tables/anchor objects)
         self._place_unconstrained_entities(scene, poses, placed_entities)
@@ -296,22 +182,15 @@ class ConstraintSolver:
             unplaced = set(all_entities) - placed_entities
             raise ValueError(f"Constraint solving incomplete. Unplaced entities: {unplaced}")
         
-        # Phase 3: Resolve collisions
-        if self.use_enhanced_collision and self.collision_optimizer:
-            # Use enhanced global collision optimization (Phase 2A)
-            logger.info("Applying enhanced collision resolution with global optimization")
-            poses = self.collision_optimizer.optimize_poses(scene, poses)
-        else:
-            # Use original collision resolution for backward compatibility
-            logger.info("Applying basic collision resolution")
-            self._resolve_collisions(scene, poses)
+        # Phase 3: Apply enhanced collision resolution (Phase 2A)
+        logger.info("Applying enhanced collision resolution with global optimization")
+        poses = self.collision_optimizer.optimize_poses(scene, poses)
         
         # Phase 4: Enhance placement with spatial reasoning (Phase 2B)
-        if self.use_spatial_reasoning and self.spatial_reasoner:
-            logger.info("Applying advanced spatial reasoning enhancements")
-            poses = self._enhance_poses_with_spatial_reasoning(scene, poses)
+        logger.info("Applying advanced spatial reasoning enhancements")
+        poses = self._enhance_poses_with_spatial_reasoning(scene, poses)
         
-        logger.info(f"Successfully solved all constraints in {iteration} iterations")
+        logger.info(f"Successfully solved all constraints in {iteration} iterations using enhanced features")
         return poses
     
     def _place_unconstrained_entities(

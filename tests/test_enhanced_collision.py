@@ -19,24 +19,20 @@ from mujoco_mcp.scene_gen import (
     Pose
 )
 
-# Try to import enhanced collision detection
-try:
-    from mujoco_mcp.scene_gen.enhanced_collision import (
-        RotationAwareAABB,
-        GlobalCollisionOptimizer,
-        PhysicsCollisionValidator,
-        quaternion_to_matrix,
-        transform_bbox_with_rotation
-    )
-    ENHANCED_COLLISION_AVAILABLE = True
-except ImportError:
-    ENHANCED_COLLISION_AVAILABLE = False
+# Import enhanced collision detection components
+from mujoco_mcp.scene_gen.enhanced_collision import (
+    RotationAwareAABB,
+    GlobalCollisionOptimizer,
+    PhysicsCollisionValidator,
+    quaternion_to_matrix,
+    transform_bbox_with_rotation
+)
 
 
 class TestQuaternionMath:
     """Test quaternion and rotation utilities."""
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_quaternion_to_matrix(self):
         """Test quaternion to rotation matrix conversion."""
         # Identity quaternion should give identity matrix
@@ -54,7 +50,7 @@ class TestQuaternionMath:
         expected = np.array([0, 1, 0])
         np.testing.assert_allclose(rotated, expected, atol=1e-10)
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_bbox_rotation_transform(self):
         """Test bounding box transformation with rotation."""
         # Unit cube centered at origin
@@ -96,7 +92,7 @@ class TestRotationAwareAABB:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_rotation_aware_aabb_creation(self):
         """Test creation of rotation-aware AABB from metadata."""
         # Get a test object
@@ -130,7 +126,7 @@ class TestRotationAwareAABB:
         assert rot_extents[0] >= no_rot_extents[0] * 0.99  # Allow small numerical error
         assert rot_extents[1] >= no_rot_extents[1] * 0.99
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_overlap_volume_calculation(self):
         """Test overlap volume calculation between AABBs."""
         # Create two overlapping AABBs
@@ -157,7 +153,7 @@ class TestRotationAwareAABB:
         volume_no_overlap = aabb1.get_overlap_volume(aabb3)
         assert volume_no_overlap == 0.0
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_surface_contact_area(self):
         """Test surface contact area estimation."""
         # Two boxes in surface contact (one on top of other)
@@ -182,7 +178,7 @@ class TestPhysicsCollisionValidator:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_physics_validator_creation(self):
         """Test that physics validator can be created."""
         validator = PhysicsCollisionValidator(self.metadata_extractor)
@@ -191,7 +187,7 @@ class TestPhysicsCollisionValidator:
         # Should handle MuJoCo availability gracefully
         assert hasattr(validator, 'physics_available')
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_collision_check_xml_generation(self):
         """Test XML generation for collision checking."""
         validator = PhysicsCollisionValidator(self.metadata_extractor)
@@ -241,7 +237,7 @@ class TestGlobalCollisionOptimizer:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_optimizer_creation(self):
         """Test that global collision optimizer can be created."""
         optimizer = GlobalCollisionOptimizer(self.metadata_extractor)
@@ -249,7 +245,7 @@ class TestGlobalCollisionOptimizer:
         assert hasattr(optimizer, 'max_iterations')
         assert hasattr(optimizer, 'convergence_threshold')
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_collision_constraint_extraction(self):
         """Test extraction of collision constraints from scene."""
         optimizer = GlobalCollisionOptimizer(self.metadata_extractor)
@@ -285,7 +281,7 @@ class TestGlobalCollisionOptimizer:
         assert collision_constraints[0].subject == "box2"
         assert collision_constraints[0].reference == "box1"
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_entity_mobility_calculation(self):
         """Test calculation of entity mobility weights."""
         optimizer = GlobalCollisionOptimizer(self.metadata_extractor)
@@ -331,16 +327,12 @@ class TestEnhancedConstraintSolver:
         self.metadata_extractor = MetadataExtractor()
         self.solver = ConstraintSolver(self.metadata_extractor)
     
-    @pytest.mark.skipif(not ENHANCED_COLLISION_AVAILABLE, reason="Enhanced collision not available")
+    
     def test_enhanced_collision_integration(self):
         """Test that enhanced collision detection is integrated correctly."""
         # Should have enhanced collision available
-        assert hasattr(self.solver, 'use_enhanced_collision')
         assert hasattr(self.solver, 'collision_optimizer')
-        
-        if ENHANCED_COLLISION_AVAILABLE:
-            assert self.solver.use_enhanced_collision is True
-            assert self.solver.collision_optimizer is not None
+        assert self.solver.collision_optimizer is not None
     
     def test_collision_resolution_with_rotation(self):
         """Test collision resolution works with rotated objects."""

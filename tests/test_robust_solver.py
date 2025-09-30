@@ -20,18 +20,14 @@ from mujoco_mcp.scene_gen import (
     Pose
 )
 
-# Try to import robust solver components
-try:
-    from mujoco_mcp.scene_gen.robust_solver import (
-        RobustConstraintSolver,
-        ConstraintConflict,
-        PlacementSolution,
-        GlobalSceneState,
-        ConstraintConflictType
-    )
-    ROBUST_SOLVER_AVAILABLE = True
-except ImportError:
-    ROBUST_SOLVER_AVAILABLE = False
+# Import robust solver components
+from mujoco_mcp.scene_gen.robust_solver import (
+    RobustConstraintSolver,
+    ConstraintConflict,
+    PlacementSolution,
+    GlobalSceneState,
+    ConstraintConflictType
+)
 
 
 class TestConstraintConflictDetection:
@@ -41,7 +37,7 @@ class TestConstraintConflictDetection:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_robust_solver_creation(self):
         """Test that robust constraint solver can be created."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -49,7 +45,7 @@ class TestConstraintConflictDetection:
         assert hasattr(solver, 'max_search_depth')
         assert hasattr(solver, 'max_alternatives_per_entity')
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_circular_dependency_detection(self):
         """Test detection of circular dependencies in constraints."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -96,7 +92,7 @@ class TestConstraintConflictDetection:
         assert "obj2" in circular_conflict.involved_entities
         assert circular_conflict.severity > 0.5
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_overconstrained_entity_detection(self):
         """Test detection of overconstrained entities."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -164,7 +160,7 @@ class TestBacktrackingSearch:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_simple_backtracking_search(self):
         """Test backtracking search on a simple scene."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -202,7 +198,7 @@ class TestBacktrackingSearch:
         assert "table1" in solution.poses
         assert "cup1" in solution.poses
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_entity_complexity_sorting(self):
         """Test sorting entities by constraint complexity."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -266,7 +262,7 @@ class TestGlobalSceneEvaluation:
         """Set up test fixtures."""
         self.metadata_extractor = MetadataExtractor()
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_constraint_satisfaction_scoring(self):
         """Test constraint satisfaction scoring."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -314,7 +310,7 @@ class TestGlobalSceneEvaluation:
         unsatisfied_score = solver._calculate_constraint_satisfaction_score(scene, unsatisfied_poses)
         assert unsatisfied_score < satisfied_score  # Should be lower
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_collision_avoidance_scoring(self):
         """Test collision avoidance scoring."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -354,7 +350,7 @@ class TestGlobalSceneEvaluation:
         overlapping_score = solver._calculate_collision_avoidance_score(scene, overlapping_poses)
         assert overlapping_score < separated_score  # Should be lower
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_global_scene_evaluation(self):
         """Test complete global scene evaluation."""
         solver = RobustConstraintSolver(self.metadata_extractor)
@@ -404,21 +400,15 @@ class TestRobustSolverIntegration:
         self.metadata_extractor = MetadataExtractor()
         self.solver = ConstraintSolver(self.metadata_extractor)
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_robust_solver_integration(self):
         """Test that robust solver is integrated correctly."""
-        if ROBUST_SOLVER_AVAILABLE:
-            assert hasattr(self.solver, 'use_robust_solver')
-            assert hasattr(self.solver, 'robust_solver')
-            assert self.solver.use_robust_solver == True
-            assert self.solver.robust_solver is not None
+        assert hasattr(self.solver, 'robust_solver')
+        assert self.solver.robust_solver is not None
     
-    @pytest.mark.skipif(not ROBUST_SOLVER_AVAILABLE, reason="Robust solver not available")
+    
     def test_robust_solver_triggering(self):
         """Test conditions that trigger robust solver usage."""
-        if not self.solver.use_robust_solver:
-            pytest.skip("Robust solver not available")
-        
         # Simple scene - should not trigger robust solver
         simple_scene_dict = {
             "objects": [

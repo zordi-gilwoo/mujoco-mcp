@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Structured Scene Generation Module
+Enhanced Structured Scene Generation Module
 
-This module provides infrastructure for generating structured MuJoCo scenes
+This module provides comprehensive infrastructure for generating structured MuJoCo scenes
 from high-level descriptions or natural language prompts.
 
-Key components:
-- Asset metadata extraction and management
-- Pydantic scene schema models
-- Spatial constraint solving
-- XML scene composition
-- LLM integration (stubbed by default)
+Enhanced features (Phases 2A-2E):
+- Enhanced collision detection with rotation-aware AABB
+- Advanced spatial reasoning with stable poses and reachability
+- Symbolic plan interface for auditable NL→Plan→Scene separation
+- Rich asset semantics with grasp sites and support surfaces
+- Robust constraint solver with backtracking and global optimization
 """
 
 from .scene_schema import (
@@ -25,114 +25,59 @@ from .constraint_solver import ConstraintSolver
 from .scene_xml_builder import SceneXMLBuilder
 from .llm_scene_generator import LLMSceneGenerator
 
-# Phase 2A: Enhanced collision detection (optional import)
-try:
-    from .enhanced_collision import (
-        GlobalCollisionOptimizer,
-        RotationAwareAABB,
-        PhysicsCollisionValidator,
-        CollisionInfo
-    )
-    _enhanced_collision_exports = [
-        "GlobalCollisionOptimizer",
-        "RotationAwareAABB", 
-        "PhysicsCollisionValidator",
-        "CollisionInfo"
-    ]
-except ImportError:
-    _enhanced_collision_exports = []
+# Phase 2A: Enhanced collision detection
+from .enhanced_collision import (
+    GlobalCollisionOptimizer,
+    RotationAwareAABB,
+    PhysicsCollisionValidator,
+    CollisionInfo
+)
 
-# Phase 2B: Advanced spatial reasoning (optional import)
-try:
-    from .spatial_reasoning import (
-        AdvancedSpatialReasoner,
-        StablePoseDatabase,
-        RobotReachabilityChecker,
-        StablePose,
-        WorkspaceVolume,
-        SupportSurface
-    )
-    _spatial_reasoning_exports = [
-        "AdvancedSpatialReasoner",
-        "StablePoseDatabase",
-        "RobotReachabilityChecker", 
-        "StablePose",
-        "WorkspaceVolume",
-        "SupportSurface"
-    ]
-except ImportError:
-    _spatial_reasoning_exports = []
+# Phase 2B: Advanced spatial reasoning
+from .spatial_reasoning import (
+    AdvancedSpatialReasoner,
+    StablePoseDatabase,
+    RobotReachabilityChecker,
+    StablePose,
+    WorkspaceVolume,
+    SupportSurface
+)
 
-# Phase 2C: Symbolic plan interface (optional import)
-try:
-    from .symbolic_plan import (
-        SymbolicPlan,
-        SymbolicOperation,
-        SymbolicPlanGenerator,
-        PlanToSceneConverter,
-        PlanValidator,
-        OperationType,
-        ConstraintCategory
-    )
-    _symbolic_plan_exports = [
-        "SymbolicPlan",
-        "SymbolicOperation", 
-        "SymbolicPlanGenerator",
-        "PlanToSceneConverter",
-        "PlanValidator",
-        "OperationType",
-        "ConstraintCategory"
-    ]
-except ImportError:
-    _symbolic_plan_exports = []
+# Phase 2C: Symbolic plan interface
+from .symbolic_plan import (
+    SymbolicPlan,
+    SymbolicOperation,
+    SymbolicPlanGenerator,
+    PlanToSceneConverter,
+    PlanValidator,
+    OperationType,
+    ConstraintCategory
+)
 
-# Phase 2D: Enhanced asset semantics (optional import)
-try:
-    from .enhanced_semantics import (
-        EnhancedAssetMetadata,
-        EnhancedAssetDatabase,
-        GraspAffordance,
-        SupportSurfaceInfo,
-        WorkspaceEnvelope,
-        RobotMountingRule,
-        AssetCategory,
-        GraspType,
-        SurfaceType
-    )
-    _enhanced_semantics_exports = [
-        "EnhancedAssetMetadata",
-        "EnhancedAssetDatabase",
-        "GraspAffordance",
-        "SupportSurfaceInfo",
-        "WorkspaceEnvelope",
-        "RobotMountingRule",
-        "AssetCategory",
-        "GraspType",
-        "SurfaceType"
-    ]
-except ImportError:
-    _enhanced_semantics_exports = []
+# Phase 2D: Enhanced asset semantics
+from .enhanced_semantics import (
+    EnhancedAssetMetadata,
+    EnhancedAssetDatabase,
+    GraspAffordance,
+    SupportSurfaceInfo,
+    WorkspaceEnvelope,
+    RobotMountingRule,
+    AssetCategory,
+    GraspType,
+    SurfaceType
+)
 
-# Phase 2E: Robust constraint solver (optional import)
-try:
-    from .robust_solver import (
-        RobustConstraintSolver,
-        ConstraintConflict,
-        PlacementSolution,
-        GlobalSceneState,
-        ConstraintConflictType
-    )
-    _robust_solver_exports = [
-        "RobustConstraintSolver",
-        "ConstraintConflict",
-        "PlacementSolution", 
-        "GlobalSceneState",
-        "ConstraintConflictType"
-    ]
-except ImportError:
-    _robust_solver_exports = []
+# Phase 2E: Robust constraint solver
+from .robust_solver import (
+    RobustConstraintSolver,
+    ConstraintConflict,
+    PlacementSolution,
+    GlobalSceneState,
+    ConstraintConflictType
+)
 
 __all__ = [
+    # Core components
     "SpatialConstraint",
     "ObjectPlacement", 
     "RobotConfiguration",
@@ -143,4 +88,45 @@ __all__ = [
     "ConstraintSolver",
     "SceneXMLBuilder", 
     "LLMSceneGenerator",
-] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports + _enhanced_semantics_exports + _robust_solver_exports
+    
+    # Phase 2A: Enhanced collision detection
+    "GlobalCollisionOptimizer",
+    "RotationAwareAABB", 
+    "PhysicsCollisionValidator",
+    "CollisionInfo",
+    
+    # Phase 2B: Advanced spatial reasoning
+    "AdvancedSpatialReasoner",
+    "StablePoseDatabase",
+    "RobotReachabilityChecker", 
+    "StablePose",
+    "WorkspaceVolume",
+    "SupportSurface",
+    
+    # Phase 2C: Symbolic plan interface
+    "SymbolicPlan",
+    "SymbolicOperation", 
+    "SymbolicPlanGenerator",
+    "PlanToSceneConverter",
+    "PlanValidator",
+    "OperationType",
+    "ConstraintCategory",
+    
+    # Phase 2D: Enhanced asset semantics
+    "EnhancedAssetMetadata",
+    "EnhancedAssetDatabase",
+    "GraspAffordance",
+    "SupportSurfaceInfo",
+    "WorkspaceEnvelope",
+    "RobotMountingRule",
+    "AssetCategory",
+    "GraspType",
+    "SurfaceType",
+    
+    # Phase 2E: Robust constraint solver
+    "RobustConstraintSolver",
+    "ConstraintConflict",
+    "PlacementSolution", 
+    "GlobalSceneState",
+    "ConstraintConflictType",
+]
