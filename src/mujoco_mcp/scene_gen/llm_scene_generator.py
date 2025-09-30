@@ -4,6 +4,8 @@ LLM Scene Generator
 
 Generates scene descriptions from natural language prompts.
 Includes stubbed LLM integration with environment variable gating.
+
+Phase 2C Enhancement: Now supports symbolic plan generation as an intermediate step.
 """
 
 import json
@@ -15,25 +17,52 @@ from .scene_schema import SceneDescription
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.llm_generator")
 
+# Phase 2C: Import symbolic plan interface
+try:
+    from .symbolic_plan import SymbolicPlanGenerator, PlanToSceneConverter
+    SYMBOLIC_PLAN_AVAILABLE = True
+    logger.info("Symbolic plan interface available (Phase 2C)")
+except ImportError:
+    SYMBOLIC_PLAN_AVAILABLE = False
+    logger.warning("Symbolic plan interface not available")
+
 
 class LLMSceneGenerator:
     """
     Generates scene descriptions from natural language using LLM integration.
     
+    Phase 2C Enhancement: Now supports symbolic plan generation as intermediate step,
+    providing explicit NL→Plan→Scene separation for better auditability.
+    
     By default, returns canned examples. Real LLM integration can be enabled
     via environment variable STRUCTURED_SCENE_LLM=enabled.
     """
     
-    def __init__(self):
+    def __init__(self, metadata_extractor=None):
         self.llm_enabled = os.getenv("STRUCTURED_SCENE_LLM", "disabled").lower() == "enabled"
         if self.llm_enabled:
             logger.info("LLM integration enabled - real LLM calls will be made")
         else:
             logger.info("LLM integration disabled - using canned examples")
+        
+        # Phase 2C: Initialize symbolic plan generator if available
+        if SYMBOLIC_PLAN_AVAILABLE and metadata_extractor:
+            self.plan_generator = SymbolicPlanGenerator(metadata_extractor)
+            self.plan_converter = PlanToSceneConverter(metadata_extractor)
+            self.use_symbolic_plans = True
+            logger.info("Using symbolic plan interface for NL→Plan→Scene pipeline")
+        else:
+            self.plan_generator = None
+            self.plan_converter = None
+            self.use_symbolic_plans = False
+            logger.info("Using direct NL→Scene pipeline")
     
     def generate_scene_description(self, prompt: str) -> SceneDescription:
         """
         Generate a scene description from natural language prompt.
+        
+        Phase 2C Enhancement: Uses symbolic plan interface when available for
+        explicit NL→Plan→Scene separation.
         
         Args:
             prompt: Natural language description of desired scene
@@ -44,10 +73,38 @@ class LLMSceneGenerator:
         Raises:
             NotImplementedError: If LLM integration is enabled but not implemented
         """
-        if self.llm_enabled:
+        if self.use_symbolic_plans:
+            return self._generate_with_symbolic_plan(prompt)
+        elif self.llm_enabled:
             return self._generate_with_llm(prompt)
         else:
             return self._generate_canned_example(prompt)
+    
+    def _generate_with_symbolic_plan(self, prompt: str) -> SceneDescription:
+        """
+        Generate scene using symbolic plan interface (Phase 2C).
+        This provides explicit NL→Plan→Scene separation for auditability.
+        """
+        logger.info(f"Generating scene using symbolic plan interface: {prompt[:50]}...")
+        
+        # Step 1: NL → Symbolic Plan
+        plan = self.plan_generator.generate_plan_from_nl(prompt)
+        
+        # Log plan details for auditability
+        logger.info(f"Generated symbolic plan '{plan.plan_id}' with {len(plan.operations)} operations")
+        if plan.validation_results.get("is_valid"):
+            logger.info("Plan validation: PASSED")
+        else:
+            logger.warning(f"Plan validation: FAILED ({len(plan.validation_results.get('errors', []))} errors)")
+            for error in plan.validation_results.get("errors", []):
+                logger.warning(f"  - {error}")
+        
+        # Step 2: Plan → Scene Description
+        scene = self.plan_converter.convert_plan_to_scene(plan)
+        
+        logger.info(f"Converted plan to scene with {len(scene.objects)} objects and {len(scene.robots)} robots")
+        
+        return scene
     
     def generate_or_stub(self, prompt: str) -> Dict[str, Any]:
         """

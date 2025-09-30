@@ -41,7 +41,7 @@ menagerie_loader = MenagerieLoader()
 metadata_extractor = MetadataExtractor()
 constraint_solver = ConstraintSolver(metadata_extractor)
 xml_builder = SceneXMLBuilder(metadata_extractor)
-llm_generator = LLMSceneGenerator()
+llm_generator = LLMSceneGenerator(metadata_extractor)  # Phase 2C: Pass metadata for symbolic plans
 
 @server.list_tools()
 async def handle_list_tools() -> List[types.Tool]:

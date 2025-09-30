@@ -63,6 +63,29 @@ try:
 except ImportError:
     _spatial_reasoning_exports = []
 
+# Phase 2C: Symbolic plan interface (optional import)
+try:
+    from .symbolic_plan import (
+        SymbolicPlan,
+        SymbolicOperation,
+        SymbolicPlanGenerator,
+        PlanToSceneConverter,
+        PlanValidator,
+        OperationType,
+        ConstraintCategory
+    )
+    _symbolic_plan_exports = [
+        "SymbolicPlan",
+        "SymbolicOperation", 
+        "SymbolicPlanGenerator",
+        "PlanToSceneConverter",
+        "PlanValidator",
+        "OperationType",
+        "ConstraintCategory"
+    ]
+except ImportError:
+    _symbolic_plan_exports = []
+
 __all__ = [
     "SpatialConstraint",
     "ObjectPlacement", 
@@ -74,4 +97,4 @@ __all__ = [
     "ConstraintSolver",
     "SceneXMLBuilder", 
     "LLMSceneGenerator",
-] + _enhanced_collision_exports + _spatial_reasoning_exports
+] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports
