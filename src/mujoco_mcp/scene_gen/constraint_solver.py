@@ -34,6 +34,15 @@ except ImportError:
     SPATIAL_REASONING_AVAILABLE = False
     logger.warning("Advanced spatial reasoning not available")
 
+# Import enhanced semantics for Phase 2D
+try:
+    from .enhanced_semantics import EnhancedAssetDatabase
+    ENHANCED_SEMANTICS_AVAILABLE = True
+    logger.info("Enhanced asset semantics enabled (Phase 2D)")
+except ImportError:
+    ENHANCED_SEMANTICS_AVAILABLE = False
+    logger.warning("Enhanced asset semantics not available")
+
 
 
     
@@ -120,6 +129,16 @@ class ConstraintSolver:
             self.spatial_reasoner = None
             self.use_spatial_reasoning = False
             logger.info("Using basic spatial reasoning")
+        
+        # Initialize enhanced semantics if available (Phase 2D)
+        if ENHANCED_SEMANTICS_AVAILABLE:
+            self.enhanced_asset_db = EnhancedAssetDatabase()
+            self.use_enhanced_semantics = True
+            logger.info("Using enhanced asset semantics for grasp sites and support surfaces")
+        else:
+            self.enhanced_asset_db = None
+            self.use_enhanced_semantics = False
+            logger.info("Using basic asset semantics")
     
     def solve(self, scene: SceneDescription) -> Dict[str, Pose]:
         """

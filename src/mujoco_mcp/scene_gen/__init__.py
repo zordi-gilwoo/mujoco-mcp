@@ -86,6 +86,33 @@ try:
 except ImportError:
     _symbolic_plan_exports = []
 
+# Phase 2D: Enhanced asset semantics (optional import)
+try:
+    from .enhanced_semantics import (
+        EnhancedAssetMetadata,
+        EnhancedAssetDatabase,
+        GraspAffordance,
+        SupportSurfaceInfo,
+        WorkspaceEnvelope,
+        RobotMountingRule,
+        AssetCategory,
+        GraspType,
+        SurfaceType
+    )
+    _enhanced_semantics_exports = [
+        "EnhancedAssetMetadata",
+        "EnhancedAssetDatabase",
+        "GraspAffordance",
+        "SupportSurfaceInfo",
+        "WorkspaceEnvelope",
+        "RobotMountingRule",
+        "AssetCategory",
+        "GraspType",
+        "SurfaceType"
+    ]
+except ImportError:
+    _enhanced_semantics_exports = []
+
 __all__ = [
     "SpatialConstraint",
     "ObjectPlacement", 
@@ -97,4 +124,4 @@ __all__ = [
     "ConstraintSolver",
     "SceneXMLBuilder", 
     "LLMSceneGenerator",
-] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports
+] + _enhanced_collision_exports + _spatial_reasoning_exports + _symbolic_plan_exports + _enhanced_semantics_exports
