@@ -1,0 +1,407 @@
+{
+  "schema_version": "2.0",
+  "description": "Enhanced asset database with rich semantic information for Phase 2D",
+  "last_updated": "2024-01-01",
+  "assets": {
+    "table_standard": {
+      "type": "table",
+      "category": "furniture",
+      "description": "Standard rectangular work table with enhanced semantics",
+      "default_dimensions": {
+        "width": 1.2,
+        "depth": 0.8,
+        "height": 0.75
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.75],
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.375],
+        "front_edge": [0.6, 0, 0.75],
+        "back_edge": [-0.6, 0, 0.75]
+      },
+      "bounding_box": {
+        "min": [-0.6, -0.4, 0],
+        "max": [0.6, 0.4, 0.75]
+      },
+      "mass": 25.0,
+      "material_properties": {
+        "friction": 0.7,
+        "hardness": 0.8,
+        "material": "wood"
+      },
+      "center_of_mass": [0, 0, 0.375],
+      "grasp_affordances": [
+        {
+          "name": "table_edge_grasp",
+          "grasp_type": "side_grasp",
+          "position": [0.6, 0, 0.75],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [-1, 0, 0],
+          "grasp_width": 0.02,
+          "force_closure_quality": 0.6,
+          "accessibility_score": 0.8,
+          "description": "Grasp edge of table for repositioning"
+        }
+      ],
+      "support_surfaces": [
+        {
+          "name": "table_top",
+          "surface_type": "horizontal_stable",
+          "center_position": [0, 0, 0.75],
+          "normal_direction": [0, 0, 1],
+          "dimensions": [1.2, 0.8],
+          "load_capacity": 50.0,
+          "stability_factor": 0.95,
+          "material_friction": 0.7,
+          "is_primary_function": true,
+          "description": "Primary work surface for object placement"
+        }
+      ],
+      "manipulation_affordances": {
+        "can_be_moved": true,
+        "requires_two_handed": true,
+        "fragile": false
+      },
+      "safety_constraints": {
+        "tip_over_threshold": 30.0,
+        "max_load": 50.0
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_top\" type=\"box\" size=\"0.6 0.4 0.02\" pos=\"0 0 0.73\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/></body>"
+    },
+    "cup_ceramic_small": {
+      "type": "cup", 
+      "category": "tableware",
+      "description": "Small ceramic cup with handle and rim grasp options",
+      "default_dimensions": {
+        "radius": 0.04,
+        "height": 0.08,
+        "handle_length": 0.02
+      },
+      "semantic_points": {
+        "top_rim": [0, 0, 0.08],
+        "bottom": [0, 0, 0],
+        "center": [0, 0, 0.04],
+        "handle_center": [0.045, 0, 0.05],
+        "pour_spout": [0, 0.04, 0.08]
+      },
+      "bounding_box": {
+        "min": [-0.04, -0.04, 0],
+        "max": [0.05, 0.04, 0.08]
+      },
+      "mass": 0.2,
+      "material_properties": {
+        "fragility": 0.8,
+        "friction": 0.6,
+        "material": "ceramic"
+      },
+      "center_of_mass": [0, 0, 0.03],
+      "grasp_affordances": [
+        {
+          "name": "cup_handle",
+          "grasp_type": "handle_grasp",
+          "position": [0.045, 0, 0.05],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [1, 0, 0],
+          "grasp_width": 0.02,
+          "force_closure_quality": 0.9,
+          "accessibility_score": 0.9,
+          "description": "Primary handle grasp for manipulation"
+        },
+        {
+          "name": "cup_rim",
+          "grasp_type": "top_grasp",
+          "position": [0, 0, 0.08],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [0, 0, -1],
+          "grasp_width": 0.08,
+          "force_closure_quality": 0.7,
+          "accessibility_score": 0.8,
+          "description": "Top grasp for careful manipulation"
+        },
+        {
+          "name": "cup_sides",
+          "grasp_type": "wrap_grasp",
+          "position": [0, 0, 0.04],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [1, 0, 0],
+          "grasp_width": 0.08,
+          "force_closure_quality": 0.6,
+          "accessibility_score": 0.7,
+          "description": "Wrap grasp around cup body"
+        }
+      ],
+      "manipulation_affordances": {
+        "can_be_filled": true,
+        "can_be_poured": true,
+        "stackable": true,
+        "fragile": true
+      },
+      "interaction_properties": {
+        "container_volume": 0.0001,
+        "opening_diameter": 0.07
+      },
+      "safety_constraints": {
+        "drop_height_limit": 0.1,
+        "max_acceleration": 5.0
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_body\" type=\"cylinder\" size=\"0.035 0.06\" pos=\"0 0 0.06\" rgba=\"0.9 0.9 0.9 1\"/><geom name=\"{name}_handle\" type=\"box\" size=\"0.005 0.01 0.02\" pos=\"0.04 0 0.05\" rgba=\"0.9 0.9 0.9 1\"/></body>"
+    },
+    "box_small": {
+      "type": "object",
+      "category": "container",
+      "description": "Small box with multiple stable orientations",
+      "default_dimensions": {
+        "width": 0.1,
+        "depth": 0.1,
+        "height": 0.1
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.1],
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.05],
+        "front_face": [0.05, 0, 0.05],
+        "back_face": [-0.05, 0, 0.05]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, 0],
+        "max": [0.05, 0.05, 0.1]
+      },
+      "mass": 0.5,
+      "material_properties": {
+        "friction": 0.8,
+        "hardness": 0.6,
+        "material": "cardboard"
+      },
+      "center_of_mass": [0, 0, 0.05],
+      "grasp_affordances": [
+        {
+          "name": "box_top",
+          "grasp_type": "top_grasp",
+          "position": [0, 0, 0.1],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [0, 0, -1],
+          "grasp_width": 0.1,
+          "force_closure_quality": 0.8,
+          "accessibility_score": 0.9,
+          "description": "Grasp from top for lifting"
+        },
+        {
+          "name": "box_sides",
+          "grasp_type": "pinch_grasp",
+          "position": [0.05, 0, 0.05],
+          "orientation": [0, 0, 0, 1],
+          "approach_direction": [-1, 0, 0],
+          "grasp_width": 0.1,
+          "force_closure_quality": 0.9,
+          "accessibility_score": 0.8,
+          "description": "Pinch grasp from opposite sides"
+        }
+      ],
+      "support_surfaces": [
+        {
+          "name": "box_top",
+          "surface_type": "horizontal_stable",
+          "center_position": [0, 0, 0.1],
+          "normal_direction": [0, 0, 1],
+          "dimensions": [0.1, 0.1],
+          "load_capacity": 2.0,
+          "stability_factor": 0.7,
+          "material_friction": 0.8,
+          "is_primary_function": false,
+          "description": "Can support small lightweight objects"
+        }
+      ],
+      "manipulation_affordances": {
+        "stackable": true,
+        "nestable": false,
+        "can_contain": true,
+        "fragile": false
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"box\" size=\"0.05 0.05 0.05\" rgba=\"0.7 0.2 0.2 1\"/></body>"
+    },
+    "franka_panda": {
+      "type": "robot",
+      "category": "robot",
+      "description": "Franka Emika Panda with enhanced workspace semantics",
+      "default_dimensions": {
+        "base_radius": 0.15,
+        "reach": 0.855,
+        "height": 1.0,
+        "workspace_radius": 0.855
+      },
+      "semantic_points": {
+        "base": [0, 0, 0],
+        "end_effector": [0.5, 0, 0.5],
+        "center": [0, 0, 0.5],
+        "shoulder": [0, 0, 0.333],
+        "elbow": [0.3, 0, 0.6]
+      },
+      "bounding_box": {
+        "min": [-0.855, -0.855, 0],
+        "max": [0.855, 0.855, 1.0]
+      },
+      "mass": 18.0,
+      "material_properties": {
+        "rigidity": 0.95,
+        "precision": 0.9,
+        "material": "aluminum_steel"
+      },
+      "center_of_mass": [0, 0, 0.4],
+      "workspace_envelopes": [
+        {
+          "name": "primary_manipulation_zone",
+          "center": [0.6, 0.0, 0.5],
+          "extents": [1.0, 1.2, 0.8],
+          "orientation": [0, 0, 0, 1],
+          "reachability_zones": {
+            "optimal": 0.9,
+            "good": 0.7,
+            "marginal": 0.4
+          },
+          "task_preferences": {
+            "pick_and_place": 0.9,
+            "assembly": 0.8,
+            "inspection": 0.7,
+            "pouring": 0.6
+          },
+          "collision_margins": {
+            "front": 0.1,
+            "sides": 0.15,
+            "back": 0.2,
+            "top": 0.3
+          },
+          "description": "Primary manipulation workspace for Franka Panda"
+        },
+        {
+          "name": "extended_reach_zone",
+          "center": [0.7, 0.0, 0.3],
+          "extents": [1.4, 1.4, 0.6],
+          "orientation": [0, 0, 0, 1],
+          "reachability_zones": {
+            "optimal": 0.6,
+            "good": 0.4,
+            "marginal": 0.2
+          },
+          "task_preferences": {
+            "pick_and_place": 0.6,
+            "inspection": 0.8
+          },
+          "collision_margins": {
+            "all_directions": 0.2
+          },
+          "description": "Extended reach zone with reduced dexterity"
+        }
+      ],
+      "robot_mounting_rules": {
+        "surface_requirements": ["horizontal_stable"],
+        "minimum_clearances": {
+          "all_directions": 0.3,
+          "front": 0.5,
+          "sides": 0.4,
+          "back": 0.3
+        },
+        "preferred_orientations": [
+          [0, 0, 0, 1],
+          [0, 0, 0.707, 0.707]
+        ],
+        "stability_requirements": {
+          "surface_load_capacity": 100.0,
+          "vibration_damping": 0.8
+        },
+        "description": "Mounting requirements for stable robot operation"
+      },
+      "joint_configs": {
+        "ready": [0, -0.785, 0, -2.356, 0, 1.571, 0.785],
+        "home": [0, 0, 0, 0, 0, 0, 0],
+        "tucked": [1.571, 0.785, 0, -1.571, 0, 2.356, 0.785],
+        "extended": [0, -0.3, 0, -2.5, 0, 2.2, 0.785],
+        "inspection": [0, -1.2, 0, -1.8, 0, 1.0, 0]
+      },
+      "manipulation_affordances": {
+        "gripper_max_width": 0.08,
+        "gripper_force": 70.0,
+        "payload_capacity": 3.0,
+        "precision": 0.1,
+        "repeatability": 0.05
+      },
+      "safety_constraints": {
+        "max_velocity": 2.0,
+        "max_acceleration": 10.0,
+        "emergency_stop_distance": 0.05,
+        "collision_sensitivity": 0.8
+      },
+      "xml_template": "<!-- Franka Panda placeholder - would include from Menagerie --><body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_base\" type=\"cylinder\" size=\"0.1 0.15\" rgba=\"0.2 0.2 0.2 1\"/><geom name=\"{name}_arm\" type=\"capsule\" size=\"0.05 0.4\" pos=\"0.3 0 0.4\" rgba=\"0.8 0.8 0.8 1\"/></body>"
+    },
+    "shelf_small": {
+      "type": "furniture",
+      "category": "furniture", 
+      "description": "Small shelf with multiple storage levels",
+      "default_dimensions": {
+        "width": 0.6,
+        "depth": 0.3,
+        "height": 1.0
+      },
+      "semantic_points": {
+        "bottom_shelf": [0, 0, 0.2],
+        "middle_shelf": [0, 0, 0.5],
+        "top_shelf": [0, 0, 0.8],
+        "center": [0, 0, 0.5]
+      },
+      "bounding_box": {
+        "min": [-0.3, -0.15, 0],
+        "max": [0.3, 0.15, 1.0]
+      },
+      "mass": 15.0,
+      "material_properties": {
+        "friction": 0.6,
+        "hardness": 0.7,
+        "material": "wood"
+      },
+      "center_of_mass": [0, 0, 0.5],
+      "support_surfaces": [
+        {
+          "name": "bottom_shelf",
+          "surface_type": "horizontal_stable",
+          "center_position": [0, 0, 0.2],
+          "normal_direction": [0, 0, 1],
+          "dimensions": [0.6, 0.3],
+          "load_capacity": 10.0,
+          "stability_factor": 0.9,
+          "material_friction": 0.6,
+          "is_primary_function": true,
+          "description": "Bottom shelf for heavy items"
+        },
+        {
+          "name": "middle_shelf",
+          "surface_type": "horizontal_stable",
+          "center_position": [0, 0, 0.5],
+          "normal_direction": [0, 0, 1],
+          "dimensions": [0.6, 0.3],
+          "load_capacity": 8.0,
+          "stability_factor": 0.85,
+          "material_friction": 0.6,
+          "is_primary_function": true,
+          "description": "Middle shelf for medium items"
+        },
+        {
+          "name": "top_shelf",
+          "surface_type": "horizontal_stable",
+          "center_position": [0, 0, 0.8],
+          "normal_direction": [0, 0, 1],
+          "dimensions": [0.6, 0.3],
+          "load_capacity": 5.0,
+          "stability_factor": 0.8,
+          "material_friction": 0.6,
+          "is_primary_function": true,
+          "description": "Top shelf for light items"
+        }
+      ],
+      "manipulation_affordances": {
+        "can_be_moved": true,
+        "requires_two_handed": true,
+        "modular": true
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_bottom\" type=\"box\" size=\"0.3 0.15 0.02\" pos=\"0 0 0.18\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_middle\" type=\"box\" size=\"0.3 0.15 0.02\" pos=\"0 0 0.48\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_top\" type=\"box\" size=\"0.3 0.15 0.02\" pos=\"0 0 0.78\" rgba=\"0.8 0.6 0.4 1\"/></body>"
+    }
+  }
+}

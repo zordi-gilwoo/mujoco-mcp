@@ -34,7 +34,11 @@ class SpatialConstraint(BaseModel):
     
     @field_validator('type')
     def validate_constraint_type(cls, v):
-        allowed_types = ['on_top_of', 'in_front_of', 'beside', 'no_collision']
+        # Phase 2B: Extended constraint types for advanced spatial reasoning
+        allowed_types = [
+            'on_top_of', 'in_front_of', 'beside', 'no_collision',
+            'inside', 'aligned_with_axis', 'oriented_towards', 'within_reach'
+        ]
         if v not in allowed_types:
             raise ValueError(f"Constraint type must be one of {allowed_types}")
         return v
