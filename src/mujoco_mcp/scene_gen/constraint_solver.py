@@ -25,6 +25,15 @@ except ImportError:
     ENHANCED_COLLISION_AVAILABLE = False
     logger.warning("Enhanced collision detection not available - using basic collision")
 
+# Import advanced spatial reasoning for Phase 2B
+try:
+    from .spatial_reasoning import AdvancedSpatialReasoner
+    SPATIAL_REASONING_AVAILABLE = True
+    logger.info("Advanced spatial reasoning enabled (Phase 2B)")
+except ImportError:
+    SPATIAL_REASONING_AVAILABLE = False
+    logger.warning("Advanced spatial reasoning not available")
+
 
 
     
@@ -101,6 +110,16 @@ class ConstraintSolver:
             self.collision_optimizer = None
             self.use_enhanced_collision = False
             logger.info("Using basic collision detection")
+        
+        # Initialize advanced spatial reasoning if available (Phase 2B)
+        if SPATIAL_REASONING_AVAILABLE:
+            self.spatial_reasoner = AdvancedSpatialReasoner(metadata_extractor)
+            self.use_spatial_reasoning = True
+            logger.info("Using advanced spatial reasoning for stable poses and reachability")
+        else:
+            self.spatial_reasoner = None
+            self.use_spatial_reasoning = False
+            logger.info("Using basic spatial reasoning")
     
     def solve(self, scene: SceneDescription) -> Dict[str, Pose]:
         """
@@ -167,6 +186,11 @@ class ConstraintSolver:
             # Use original collision resolution for backward compatibility
             logger.info("Applying basic collision resolution")
             self._resolve_collisions(scene, poses)
+        
+        # Phase 4: Enhance placement with spatial reasoning (Phase 2B)
+        if self.use_spatial_reasoning and self.spatial_reasoner:
+            logger.info("Applying advanced spatial reasoning enhancements")
+            poses = self._enhance_poses_with_spatial_reasoning(scene, poses)
         
         logger.info(f"Successfully solved all constraints in {iteration} iterations")
         return poses
@@ -296,6 +320,19 @@ class ConstraintSolver:
         elif constraint.type == "beside":
             return self._apply_beside(
                 constraint, entity_metadata, reference_pose, reference_metadata
+            )
+        # Phase 2B: New constraint types
+        elif constraint.type == "inside":
+            return self._apply_inside(
+                constraint, entity_metadata, reference_pose, reference_metadata
+            )
+        elif constraint.type == "aligned_with_axis":
+            return self._apply_aligned_with_axis(
+                constraint, entity_metadata, reference_pose, reference_metadata
+            )
+        elif constraint.type == "within_reach":
+            return self._apply_within_reach(
+                constraint, entity_metadata, reference_pose, reference_metadata, scene
             )
         else:
             logger.warning(f"Unknown constraint type: {constraint.type}")
@@ -442,3 +479,160 @@ class ConstraintSolver:
                 break
         else:
             logger.warning(f"Collision resolution did not converge after {self.max_collision_iterations} iterations")
+    
+    # Phase 2B: New constraint type implementations
+    def _apply_inside(
+        self, 
+        constraint: SpatialConstraint,
+        entity_metadata: AssetMetadata,
+        reference_pose: Pose,
+        reference_metadata: AssetMetadata
+    ) -> np.ndarray:
+        """Apply inside constraint (entity placed inside reference container)."""
+        # Place entity at center of reference container
+        position = reference_pose.position.copy()
+        
+        # Apply optional offset
+        if constraint.offset:
+            position += np.array(constraint.offset)
+        
+        return position
+    
+    def _apply_aligned_with_axis(
+        self, 
+        constraint: SpatialConstraint,
+        entity_metadata: AssetMetadata,
+        reference_pose: Pose,
+        reference_metadata: AssetMetadata
+    ) -> np.ndarray:
+        """Apply aligned_with_axis constraint (entity aligned along an axis of reference)."""
+        # For now, align along X-axis at same Y and Z
+        position = reference_pose.position.copy()
+        
+        # Get reference dimensions to place entity next to reference
+        ref_dims = reference_metadata.get_dimensions()
+        entity_dims = entity_metadata.get_dimensions()
+        
+        # Place along X-axis with clearance
+        position[0] += ref_dims.get('width', 0.1)/2 + entity_dims.get('width', 0.1)/2 + constraint.clearance
+        
+        # Apply optional offset
+        if constraint.offset:
+            position += np.array(constraint.offset)
+        
+        return position
+    
+    def _apply_within_reach(
+        self, 
+        constraint: SpatialConstraint,
+        entity_metadata: AssetMetadata,
+        reference_pose: Pose,
+        reference_metadata: AssetMetadata,
+        scene: SceneDescription
+    ) -> np.ndarray:
+        """Apply within_reach constraint (entity positioned within robot's reach)."""
+        # If spatial reasoning is available, use reachability checker
+        if self.use_spatial_reasoning and self.spatial_reasoner:
+            # Find robot in scene
+            robot_type = None
+            for robot in scene.robots:
+                if robot.robot_id == constraint.reference:
+                    robot_type = robot.robot_type
+                    break
+            
+            if robot_type:
+                # Position entity within optimal reach distance
+                reach_specs = self.spatial_reasoner.reachability_checker.robot_specs.get(robot_type, {})
+                optimal_distance = reach_specs.get('reach_radius', 0.8) * 0.7  # 70% of max reach
+                
+                # Place in front of robot at optimal distance
+                direction = np.array([1, 0, 0])  # Default forward direction
+                position = reference_pose.position + direction * optimal_distance
+                
+                # Ensure reasonable height
+                position[2] = max(position[2], reference_pose.position[2] + 0.3)
+                
+                return position
+        
+        # Fallback: place in front at reasonable distance
+        position = reference_pose.position.copy()
+        position[0] += 0.6  # 60cm in front
+        position[2] += 0.3  # 30cm up
+        
+        # Apply optional offset
+        if constraint.offset:
+            position += np.array(constraint.offset)
+        
+        return position
+    
+    def _enhance_poses_with_spatial_reasoning(self, scene: SceneDescription, poses: Dict[str, Pose]) -> Dict[str, Pose]:
+        """Enhance poses using advanced spatial reasoning (Phase 2B)."""
+        enhanced_poses = poses.copy()
+        
+        # Enhance object placements with stable pose reasoning
+        for obj in scene.objects:
+            if obj.object_id not in enhanced_poses:
+                continue
+                
+            # Find support surface for this object
+            support_entity_id = None
+            support_constraint = None
+            
+            for constraint in obj.constraints:
+                if constraint.type == "on_top_of":
+                    support_entity_id = constraint.reference
+                    support_constraint = constraint
+                    break
+            
+            if support_entity_id and support_entity_id in enhanced_poses:
+                support_metadata = self._get_entity_metadata(support_entity_id, scene)
+                support_pose = enhanced_poses[support_entity_id]
+                
+                # Use spatial reasoner to enhance placement
+                enhanced_pose, stability_score = self.spatial_reasoner.enhance_object_placement(
+                    obj, support_metadata, support_pose
+                )
+                
+                # Apply any additional constraints (like offset)
+                if support_constraint and support_constraint.offset:
+                    enhanced_pose.position += np.array(support_constraint.offset)
+                
+                enhanced_poses[obj.object_id] = enhanced_pose
+                logger.debug(f"Enhanced {obj.object_id} placement with stability score: {stability_score:.2f}")
+        
+        # Optimize robot base positions for reachability
+        for robot in scene.robots:
+            if robot.robot_id not in enhanced_poses:
+                continue
+            
+            # Get manipulation targets (objects the robot should reach)
+            target_positions = []
+            for obj in scene.objects:
+                if obj.object_id in enhanced_poses:
+                    # Only consider small objects as manipulation targets
+                    if "cup" in obj.object_type or "box" in obj.object_type:
+                        target_positions.append(enhanced_poses[obj.object_id].position)
+            
+            if target_positions:
+                # Find optimal base position
+                optimal_pos, reachability_score = self.spatial_reasoner.reachability_checker.find_optimal_base_position(
+                    robot.robot_type, target_positions, scene, enhanced_poses
+                )
+                
+                # Update robot pose if significant improvement
+                current_pose = enhanced_poses[robot.robot_id]
+                if reachability_score > 0.7:  # Only update if good reachability
+                    enhanced_poses[robot.robot_id] = Pose(
+                        position=optimal_pos,
+                        orientation=current_pose.orientation
+                    )
+                    logger.debug(f"Optimized {robot.robot_id} base position for reachability: {reachability_score:.2f}")
+        
+        # Validate workspace and log suggestions
+        workspace_suggestions = self.spatial_reasoner.suggest_workspace_improvements(scene, enhanced_poses)
+        if workspace_suggestions:
+            logger.info("Workspace improvement suggestions:")
+            for suggestion in workspace_suggestions:
+                logger.info(f"  - {suggestion}")
+        
+        return enhanced_poses

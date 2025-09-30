@@ -42,6 +42,27 @@ try:
 except ImportError:
     _enhanced_collision_exports = []
 
+# Phase 2B: Advanced spatial reasoning (optional import)
+try:
+    from .spatial_reasoning import (
+        AdvancedSpatialReasoner,
+        StablePoseDatabase,
+        RobotReachabilityChecker,
+        StablePose,
+        WorkspaceVolume,
+        SupportSurface
+    )
+    _spatial_reasoning_exports = [
+        "AdvancedSpatialReasoner",
+        "StablePoseDatabase",
+        "RobotReachabilityChecker", 
+        "StablePose",
+        "WorkspaceVolume",
+        "SupportSurface"
+    ]
+except ImportError:
+    _spatial_reasoning_exports = []
+
 __all__ = [
     "SpatialConstraint",
     "ObjectPlacement", 
@@ -53,4 +74,4 @@ __all__ = [
     "ConstraintSolver",
     "SceneXMLBuilder", 
     "LLMSceneGenerator",
-] + _enhanced_collision_exports
+] + _enhanced_collision_exports + _spatial_reasoning_exports
