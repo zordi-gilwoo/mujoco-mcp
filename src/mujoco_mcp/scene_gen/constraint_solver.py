@@ -39,6 +39,10 @@ class ConstraintSolver:
         self.max_collision_iterations = 10
         self.collision_push_distance = 0.01  # meters
         
+        # Enhanced features control
+        self.use_spatial_reasoning = True  # Always enabled in enhanced mode
+        self.use_enhanced_collision = True  # Always enabled in enhanced mode
+        
         # Initialize all enhanced systems (always available)
         self.collision_optimizer = GlobalCollisionOptimizer(metadata_extractor)
         self.spatial_reasoner = AdvancedSpatialReasoner(metadata_extractor)

@@ -495,3 +495,11 @@ class EnhancedAssetDatabase:
                 if primary_surface and primary_surface.stability_factor >= required_stability:
                     compatible.append(asset)
         return compatible
+    
+    def get_available_assets(self) -> List[str]:
+        """Get list of all available asset IDs (for compatibility with basic database)."""
+        return list(self.enhanced_assets.keys())
+    
+    def list_assets(self) -> List[str]:
+        """List all available asset IDs."""
+        return list(self.enhanced_assets.keys())

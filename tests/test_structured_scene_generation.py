@@ -376,24 +376,26 @@ class TestLLMSceneGenerator:
     
     def setup_method(self):
         """Set up test fixtures."""
-        self.generator = LLMSceneGenerator()
+        self.extractor = MetadataExtractor()
+        self.generator = LLMSceneGenerator(self.extractor)
     
     def test_canned_example_generation(self):
         """Test generation of canned example scenes."""
-        # Test different prompt types
-        prompts = [
-            "Create a table with a cup and robot",
-            "I need a collision test scene",
-            "Make a simple scene",
-            "Something else entirely"
+        # Test different prompt types - enhanced version uses keyword matching
+        prompts_and_expected = [
+            ("Create a table with a cup and robot", 3),  # table + cup + robot
+            ("I need a table and box collision test scene", 2),  # table + box
+            ("Make a simple table scene", 1),  # table only
+            ("Put a cup on the table", 2)  # table + cup
         ]
         
-        for prompt in prompts:
+        for prompt, expected_entities in prompts_and_expected:
             scene_dict = self.generator.generate_or_stub(prompt)
             
             # Should return valid JSON that can create SceneDescription
             scene = SceneDescription(**scene_dict)
-            assert len(scene.get_all_entity_ids()) > 0
+            entity_ids = scene.get_all_entity_ids()
+            assert len(entity_ids) == expected_entities, f"Expected {expected_entities} entities for '{prompt}', got {len(entity_ids)}: {entity_ids}"
     
     def test_llm_prompt_building(self):
         """Test LLM prompt construction."""
@@ -406,7 +408,7 @@ class TestLLMSceneGenerator:
     @patch.dict('os.environ', {'STRUCTURED_SCENE_LLM': 'enabled'})
     def test_llm_integration_placeholder(self):
         """Test that LLM integration raises NotImplementedError when enabled."""
-        generator = LLMSceneGenerator()
+        generator = LLMSceneGenerator(self.extractor)
         
         with pytest.raises(NotImplementedError, match="Real LLM integration not yet implemented"):
             generator.generate_scene_description("test prompt")
@@ -420,7 +422,7 @@ class TestIntegration:
         self.extractor = MetadataExtractor()
         self.solver = ConstraintSolver(self.extractor)
         self.builder = SceneXMLBuilder(self.extractor)
-        self.llm_generator = LLMSceneGenerator()
+        self.llm_generator = LLMSceneGenerator(self.extractor)
     
     def test_end_to_end_pipeline(self):
         """Test the complete pipeline from natural language to XML."""
