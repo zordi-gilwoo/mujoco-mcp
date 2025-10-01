@@ -167,161 +167,120 @@ body {
     font-size: 1.1rem;
 }
 
-/* API Key Configuration Section */
+/* API Key Configuration Section - Compact */
 .api-key-section {
     background-color: #2a2a2a;
-    border: 2px solid #4a4a4a;
-    border-radius: 8px;
-    padding: 1.5rem;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 0.75rem;
     margin-bottom: 1rem;
 }
 
-.api-key-warning {
+.api-key-compact {
     display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-    background-color: #3a2a0a;
-    border: 1px solid #6a5a0a;
-    border-radius: 6px;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.warning-icon {
-    font-size: 1.5rem;
-    flex-shrink: 0;
-}
-
-.warning-text {
-    color: #ffcc00;
-    font-size: 0.9rem;
-    line-height: 1.4;
-}
-
-.api-key-inputs {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.api-key-input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.api-key-input-group label {
-    font-weight: 500;
-    color: #cccccc;
-}
-
-.provider-dropdown {
-    background-color: #333;
-    border: 1px solid #555;
-    border-radius: 4px;
-    color: #fff;
-    padding: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.provider-dropdown:focus {
-    outline: none;
-    border-color: #4CAF50;
-}
-
-.api-key-input-container {
-    display: flex;
-    gap: 0.5rem;
     align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
 }
 
-.api-key-field {
-    flex: 1;
+.api-key-title {
+    color: #ffcc00;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.provider-dropdown-compact {
     background-color: #333;
     border: 1px solid #555;
-    border-radius: 4px;
+    border-radius: 3px;
     color: #fff;
-    padding: 0.5rem;
-    font-size: 0.9rem;
-    font-family: monospace;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    min-width: 70px;
 }
 
-.api-key-field:focus {
+.provider-dropdown-compact:focus {
     outline: none;
     border-color: #4CAF50;
 }
 
-.toggle-visibility-btn {
+.api-key-field-compact {
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #fff;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    min-width: 120px;
+    flex: 1;
+}
+
+.api-key-field-compact:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.toggle-visibility-btn-compact {
     background-color: #444;
     border: 1px solid #555;
-    border-radius: 4px;
+    border-radius: 3px;
     color: #fff;
-    padding: 0.5rem 0.75rem;
+    padding: 0.25rem 0.4rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.7rem;
+    min-width: 24px;
 }
 
-.toggle-visibility-btn:hover {
+.toggle-visibility-btn-compact:hover {
     background-color: #555;
 }
 
-.save-api-key-btn {
+.save-api-key-btn-compact {
     background-color: #4CAF50;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     color: white;
-    padding: 0.5rem 1rem;
+    padding: 0.25rem 0.5rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 500;
 }
 
-.save-api-key-btn:disabled {
+.save-api-key-btn-compact:disabled {
     background-color: #666;
     cursor: not-allowed;
 }
 
-.save-api-key-btn:not(:disabled):hover {
+.save-api-key-btn-compact:not(:disabled):hover {
     background-color: #45a049;
 }
 
-.api-key-status {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 1rem;
+.status-indicator-compact {
+    font-size: 0.8rem;
+    margin: 0;
 }
 
-.status-indicator {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.9rem;
-}
-
-.status-none .status-icon {
+.status-indicator-compact.status-none {
     color: #f44336;
 }
 
-.status-configured .status-icon {
+.status-indicator-compact.status-configured {
     color: #4CAF50;
 }
 
-.status-configured .status-text {
-    color: #4CAF50;
-}
-
-.clear-api-key-btn {
+.clear-api-key-btn-compact {
     background-color: #f44336;
     border: none;
-    border-radius: 4px;
+    border-radius: 3px;
     color: white;
-    padding: 0.25rem 0.75rem;
+    padding: 0.25rem 0.5rem;
     cursor: pointer;
-    font-size: 0.8rem;
+    font-size: 0.7rem;
 }
 
-.clear-api-key-btn:hover {
+.clear-api-key-btn-compact:hover {
     background-color: #d32f2f;
 }
 

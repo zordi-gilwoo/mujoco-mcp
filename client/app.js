@@ -1985,18 +1985,14 @@ if __name__ == "__main__":
         const clearBtn = this.elements.clearApiKeyBtn;
         
         if (isConfigured) {
-            indicator.className = 'status-indicator status-configured';
-            indicator.innerHTML = `
-                <span class="status-icon">✅</span>
-                <span class="status-text">${provider.toUpperCase()} API key configured</span>
-            `;
+            indicator.className = 'status-indicator-compact status-configured';
+            indicator.textContent = '✅';
+            indicator.title = `${provider.toUpperCase()} API key configured`;
             clearBtn.style.display = 'inline-block';
         } else {
-            indicator.className = 'status-indicator status-none';
-            indicator.innerHTML = `
-                <span class="status-icon">❌</span>
-                <span class="status-text">No API key configured</span>
-            `;
+            indicator.className = 'status-indicator-compact status-none';
+            indicator.textContent = '❌';
+            indicator.title = 'No API key configured';
             clearBtn.style.display = 'none';
         }
     }
