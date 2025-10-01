@@ -36,6 +36,24 @@
 
             <div class="control-panel">
 
+                <!-- API Key Configuration Section -->
+                <div class="panel-section api-key-section">
+                    <div class="api-key-compact">
+                        <span class="api-key-title">⚠️ AI API Key</span>
+                        <select id="ai-provider-select" class="provider-dropdown-compact">
+                            <option value="">Provider</option>
+                            <option value="gpt">GPT</option>
+                            <option value="claude">Claude</option>
+                        </select>
+                        <input type="password" id="api-key-input" class="api-key-field-compact" 
+                               placeholder="Enter API key..." 
+                               autocomplete="new-password">
+                        <button id="toggle-api-key-visibility" class="toggle-visibility-btn-compact" type="button">👁️</button>
+                        <button id="save-api-key-btn" class="save-api-key-btn-compact" disabled>Save</button>
+                        <span id="api-key-status-indicator" class="status-indicator-compact status-none">❌</span>
+                        <button id="clear-api-key-btn" class="clear-api-key-btn-compact" style="display: none;">Clear</button>
+                    </div>
+                </div>
 
                 <div class="panel-section">
                     <h3>🤖 Free-Style Commands</h3>

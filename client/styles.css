@@ -167,6 +167,123 @@ body {
     font-size: 1.1rem;
 }
 
+/* API Key Configuration Section - Compact */
+.api-key-section {
+    background-color: #2a2a2a;
+    border: 1px solid #4a4a4a;
+    border-radius: 4px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.api-key-compact {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.api-key-title {
+    color: #ffcc00;
+    font-size: 0.85rem;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.provider-dropdown-compact {
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #fff;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    min-width: 70px;
+}
+
+.provider-dropdown-compact:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.api-key-field-compact {
+    background-color: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #fff;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+    min-width: 120px;
+    flex: 1;
+}
+
+.api-key-field-compact:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.toggle-visibility-btn-compact {
+    background-color: #444;
+    border: 1px solid #555;
+    border-radius: 3px;
+    color: #fff;
+    padding: 0.25rem 0.4rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+    min-width: 24px;
+}
+
+.toggle-visibility-btn-compact:hover {
+    background-color: #555;
+}
+
+.save-api-key-btn-compact {
+    background-color: #4CAF50;
+    border: none;
+    border-radius: 3px;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.save-api-key-btn-compact:disabled {
+    background-color: #666;
+    cursor: not-allowed;
+}
+
+.save-api-key-btn-compact:not(:disabled):hover {
+    background-color: #45a049;
+}
+
+.status-indicator-compact {
+    font-size: 0.8rem;
+    margin: 0;
+}
+
+.status-indicator-compact.status-none {
+    color: #f44336;
+}
+
+.status-indicator-compact.status-configured {
+    color: #4CAF50;
+}
+
+.clear-api-key-btn-compact {
+    background-color: #f44336;
+    border: none;
+    border-radius: 3px;
+    color: white;
+    padding: 0.25rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.7rem;
+}
+
+.clear-api-key-btn-compact:hover {
+    background-color: #d32f2f;
+}
+
 .control-group {
     margin-bottom: 1rem;
 }
