@@ -47,6 +47,7 @@ class RemoteViewer {
     init() {
         this.setupDOM();
         this.setupEventListeners();
+        this.loadApiKeyConfiguration();
         this.updateUI();
         this.loadConfig()
             .finally(() => this.autoConnect());
@@ -110,7 +111,15 @@ class RemoteViewer {
             eventLog: document.getElementById('event-log'),
             statConnected: document.getElementById('stat-connected'),
             statFrames: document.getElementById('stat-frames'),
-            statEvents: document.getElementById('stat-events')
+            statEvents: document.getElementById('stat-events'),
+            
+            // API Key Configuration
+            aiProviderSelect: document.getElementById('ai-provider-select'),
+            apiKeyInput: document.getElementById('api-key-input'),
+            toggleApiKeyVisibility: document.getElementById('toggle-api-key-visibility'),
+            saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+            apiKeyStatusIndicator: document.getElementById('api-key-status-indicator'),
+            clearApiKeyBtn: document.getElementById('clear-api-key-btn')
         };
     }
     
@@ -183,6 +192,13 @@ class RemoteViewer {
                 this.executeFreestyleCommand();
             });
         });
+        
+        // API Key Configuration
+        safeOn(this.elements.aiProviderSelect, 'change', () => this.handleProviderChange());
+        safeOn(this.elements.apiKeyInput, 'input', () => this.handleApiKeyInputChange());
+        safeOn(this.elements.toggleApiKeyVisibility, 'click', () => this.toggleApiKeyVisibility());
+        safeOn(this.elements.saveApiKeyBtn, 'click', () => this.saveApiKey());
+        safeOn(this.elements.clearApiKeyBtn, 'click', () => this.clearApiKey());
         
         // Video interaction events
         this.setupVideoInteraction();
@@ -1831,6 +1847,206 @@ if __name__ == "__main__":
         }
 
         return false;
+    }
+    
+    /**
+     * Load API key configuration from localStorage
+     */
+    loadApiKeyConfiguration() {
+        try {
+            const savedProvider = localStorage.getItem('ai_provider');
+            const savedApiKey = localStorage.getItem('ai_api_key');
+            
+            if (savedProvider && savedApiKey) {
+                this.elements.aiProviderSelect.value = savedProvider;
+                this.elements.apiKeyInput.value = savedApiKey;
+                this.updateApiKeyStatus(true, savedProvider);
+            } else {
+                this.updateApiKeyStatus(false);
+            }
+            
+            this.handleApiKeyInputChange();
+        } catch (error) {
+            console.warn('[RemoteViewer] Failed to load API key configuration:', error);
+            this.updateApiKeyStatus(false);
+        }
+    }
+    
+    /**
+     * Handle AI provider selection change
+     */
+    handleProviderChange() {
+        const provider = this.elements.aiProviderSelect.value;
+        
+        if (provider) {
+            // Clear the API key input when changing providers
+            this.elements.apiKeyInput.value = '';
+            this.elements.apiKeyInput.placeholder = `Enter your ${provider.toUpperCase()} API key...`;
+            this.handleApiKeyInputChange();
+        } else {
+            this.elements.apiKeyInput.placeholder = 'Select a provider first...';
+            this.elements.apiKeyInput.disabled = true;
+            this.elements.saveApiKeyBtn.disabled = true;
+        }
+        
+        this.elements.apiKeyInput.disabled = !provider;
+    }
+    
+    /**
+     * Handle API key input changes
+     */
+    handleApiKeyInputChange() {
+        const provider = this.elements.aiProviderSelect.value;
+        const apiKey = this.elements.apiKeyInput.value.trim();
+        
+        // Enable save button only if both provider and API key are provided
+        this.elements.saveApiKeyBtn.disabled = !provider || !apiKey;
+    }
+    
+    /**
+     * Toggle API key visibility
+     */
+    toggleApiKeyVisibility() {
+        const input = this.elements.apiKeyInput;
+        const btn = this.elements.toggleApiKeyVisibility;
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = '🙈';
+        } else {
+            input.type = 'password';
+            btn.textContent = '👁️';
+        }
+    }
+    
+    /**
+     * Save API key configuration
+     */
+    saveApiKey() {
+        const provider = this.elements.aiProviderSelect.value;
+        const apiKey = this.elements.apiKeyInput.value.trim();
+        
+        if (!provider || !apiKey) {
+            this.logEvent('API Key', 'Provider and API key are required');
+            return;
+        }
+        
+        try {
+            // Save to localStorage
+            localStorage.setItem('ai_provider', provider);
+            localStorage.setItem('ai_api_key', apiKey);
+            
+            // Update UI
+            this.updateApiKeyStatus(true, provider);
+            this.logEvent('API Key', `${provider.toUpperCase()} API key saved successfully`);
+            
+            // Send API key to backend for use in generation
+            this.updateBackendApiKey(provider, apiKey);
+            
+        } catch (error) {
+            console.error('[RemoteViewer] Failed to save API key:', error);
+            this.logEvent('Error', `Failed to save API key: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Clear API key configuration
+     */
+    clearApiKey() {
+        try {
+            // Remove from localStorage
+            localStorage.removeItem('ai_provider');
+            localStorage.removeItem('ai_api_key');
+            
+            // Reset UI
+            this.elements.aiProviderSelect.value = '';
+            this.elements.apiKeyInput.value = '';
+            this.elements.apiKeyInput.type = 'password';
+            this.elements.toggleApiKeyVisibility.textContent = '👁️';
+            this.handleProviderChange();
+            this.updateApiKeyStatus(false);
+            
+            this.logEvent('API Key', 'API key configuration cleared');
+            
+            // Clear API key from backend
+            this.updateBackendApiKey('', '');
+            
+        } catch (error) {
+            console.error('[RemoteViewer] Failed to clear API key:', error);
+            this.logEvent('Error', `Failed to clear API key: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Update API key status indicator
+     */
+    updateApiKeyStatus(isConfigured, provider = '') {
+        const indicator = this.elements.apiKeyStatusIndicator;
+        const clearBtn = this.elements.clearApiKeyBtn;
+        
+        if (isConfigured) {
+            indicator.className = 'status-indicator status-configured';
+            indicator.innerHTML = `
+                <span class="status-icon">✅</span>
+                <span class="status-text">${provider.toUpperCase()} API key configured</span>
+            `;
+            clearBtn.style.display = 'inline-block';
+        } else {
+            indicator.className = 'status-indicator status-none';
+            indicator.innerHTML = `
+                <span class="status-icon">❌</span>
+                <span class="status-text">No API key configured</span>
+            `;
+            clearBtn.style.display = 'none';
+        }
+    }
+    
+    /**
+     * Update backend with API key for scene generation
+     */
+    async updateBackendApiKey(provider, apiKey) {
+        try {
+            const response = await fetch('/api/config/api-key', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    provider: provider,
+                    api_key: apiKey
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('[RemoteViewer] Backend API key updated:', result);
+            
+        } catch (error) {
+            console.warn('[RemoteViewer] Failed to update backend API key:', error);
+            // Don't show error to user as this is not critical for basic functionality
+        }
+    }
+    
+    /**
+     * Get current API key configuration
+     */
+    getApiKeyConfiguration() {
+        try {
+            const provider = localStorage.getItem('ai_provider');
+            const apiKey = localStorage.getItem('ai_api_key');
+            
+            return {
+                provider: provider || '',
+                apiKey: apiKey || '',
+                isConfigured: !!(provider && apiKey)
+            };
+        } catch (error) {
+            console.warn('[RemoteViewer] Failed to get API key configuration:', error);
+            return { provider: '', apiKey: '', isConfigured: false };
+        }
     }
 }
 
