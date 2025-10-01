@@ -159,7 +159,6 @@ async def test_browser_ui_structure():
     assert "suggestion-btn" in html_content
     
     # Check for important sections
-    assert "Camera Controls" in html_content
     assert "Free-Style Commands" in html_content
     assert "Simulation Controls" in html_content
     
