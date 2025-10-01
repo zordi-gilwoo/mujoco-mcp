@@ -118,7 +118,9 @@ class RemoteViewer {
             apiKeyInput: document.getElementById('api-key-input'),
             toggleApiKeyVisibility: document.getElementById('toggle-api-key-visibility'),
             saveApiKeyBtn: document.getElementById('save-api-key-btn'),
+            testAiBtn: document.getElementById('test-ai-btn'),
             apiKeyStatusIndicator: document.getElementById('api-key-status-indicator'),
+            aiIntegrationStatus: document.getElementById('ai-integration-status'),
             clearApiKeyBtn: document.getElementById('clear-api-key-btn')
         };
     }
@@ -198,6 +200,7 @@ class RemoteViewer {
         safeOn(this.elements.apiKeyInput, 'input', () => this.handleApiKeyInputChange());
         safeOn(this.elements.toggleApiKeyVisibility, 'click', () => this.toggleApiKeyVisibility());
         safeOn(this.elements.saveApiKeyBtn, 'click', () => this.saveApiKey());
+        safeOn(this.elements.testAiBtn, 'click', () => this.testAiIntegration());
         safeOn(this.elements.clearApiKeyBtn, 'click', () => this.clearApiKey());
         
         // Video interaction events
@@ -1564,32 +1567,70 @@ if __name__ == "__main__":
         this.logEvent('Command', `Executing: "${command}"`);
         
         try {
-            // Send command to MCP server
-            const response = await fetch('/api/execute-command', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    command: command
-                })
-            });
+            // Check if this looks like a scene generation request and we have LLM configured
+            const isSceneGeneration = this.isSceneGenerationCommand(command);
+            const apiKeyConfig = this.getApiKeyConfiguration();
             
-            const result = await response.json();
-            
-            if (response.ok && result.success) {
-                this.showCommandResult('success', result.result || result.message);
-                this.logEvent('Command', 'Command executed successfully');
+            if (isSceneGeneration && apiKeyConfig.provider && apiKeyConfig.apiKey) {
+                // Use LLM for scene generation
+                this.showCommandResult('loading', 'Generating scene with AI...');
+                this.logEvent('Command', `Using ${apiKeyConfig.provider.toUpperCase()} for scene generation`);
                 
-                // Check if scene was updated and refresh if connected
-                if (this.isConnected && (result.actions_taken?.includes('created_scene') || 
-                    result.actions_taken?.includes('created_menagerie_scene'))) {
-                    this.sendEvent({
-                        type: 'refresh_scene'
-                    });
+                const response = await fetch('/api/scene/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt: command,
+                        provider: apiKeyConfig.provider,
+                        api_key: apiKeyConfig.apiKey
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    // Load the generated scene
+                    if (result.xml) {
+                        await this.loadSceneFromXML(result.xml);
+                        this.showCommandResult('success', `Scene generated successfully: ${result.description || 'Scene loaded'}`);
+                        this.logEvent('Command', 'AI scene generation successful');
+                    } else {
+                        this.showCommandResult('success', result.description || 'Scene generated successfully');
+                        this.logEvent('Command', 'AI scene generation completed');
+                    }
+                } else {
+                    throw new Error(result.error || 'Scene generation failed');
                 }
             } else {
-                throw new Error(result.error || result.message || 'Command execution failed');
+                // Use regular MCP server execution
+                const response = await fetch('/api/execute-command', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        command: command
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    this.showCommandResult('success', result.result || result.message);
+                    this.logEvent('Command', 'Command executed successfully');
+                    
+                    // Check if scene was updated and refresh if connected
+                    if (this.isConnected && (result.actions_taken?.includes('created_scene') || 
+                        result.actions_taken?.includes('created_menagerie_scene'))) {
+                        this.sendEvent({
+                            type: 'refresh_scene'
+                        });
+                    }
+                } else {
+                    throw new Error(result.error || result.message || 'Command execution failed');
+                }
             }
             
         } catch (error) {
@@ -1600,6 +1641,55 @@ if __name__ == "__main__":
             this.elements.executeCommandBtn.classList.remove('executing');
             this.elements.executeCommandBtn.textContent = 'Execute Command';
             this.handleFreestyleInputChange(); // Re-enable based on input content
+        }
+    }
+    
+    /**
+     * Check if a command looks like a scene generation request
+     */
+    isSceneGenerationCommand(command) {
+        const sceneKeywords = [
+            'create', 'make', 'build', 'generate', 'add', 'spawn',
+            'pendulum', 'robot', 'arm', 'leg', 'box', 'sphere', 'cylinder',
+            'ball', 'cube', 'wall', 'floor', 'ground', 'platform',
+            'scene', 'world', 'environment', 'setup'
+        ];
+        
+        const commandLower = command.toLowerCase();
+        return sceneKeywords.some(keyword => commandLower.includes(keyword));
+    }
+    
+    /**
+     * Load scene from XML data
+     */
+    async loadSceneFromXML(xmlData) {
+        try {
+            const response = await fetch('/api/scene/load', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    xml: xmlData
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                // Refresh the scene in WebRTC viewer if connected
+                if (this.isConnected) {
+                    this.sendEvent({
+                        type: 'refresh_scene'
+                    });
+                }
+                return true;
+            } else {
+                throw new Error(result.error || 'Failed to load scene');
+            }
+        } catch (error) {
+            console.error('[RemoteViewer] Failed to load scene from XML:', error);
+            throw error;
         }
     }
     
@@ -1909,6 +1999,18 @@ if __name__ == "__main__":
         
         // Enable save button only if both provider and API key are provided
         this.elements.saveApiKeyBtn.disabled = !provider || !apiKey;
+        this.elements.testAiBtn.disabled = !provider || !apiKey;
+        
+        // Update status text
+        if (this.elements.aiIntegrationStatus) {
+            if (!provider) {
+                this.elements.aiIntegrationStatus.textContent = 'Select an AI provider to continue.';
+            } else if (!apiKey) {
+                this.elements.aiIntegrationStatus.textContent = `Enter your ${provider.toUpperCase()} API key to enable scene generation.`;
+            } else {
+                this.elements.aiIntegrationStatus.textContent = `Ready to test ${provider.toUpperCase()} integration.`;
+            }
+        }
     }
     
     /**
@@ -1958,6 +2060,83 @@ if __name__ == "__main__":
     }
     
     /**
+     * Test AI Integration
+     */
+    async testAiIntegration() {
+        const provider = this.elements.aiProviderSelect.value;
+        const apiKey = this.elements.apiKeyInput.value.trim();
+        
+        if (!provider || !apiKey) {
+            this.logEvent('AI Test', 'Provider and API key are required');
+            return;
+        }
+        
+        try {
+            // Update UI to show testing state
+            this.elements.testAiBtn.disabled = true;
+            this.elements.testAiBtn.textContent = 'Testing...';
+            this.elements.apiKeyStatusIndicator.className = 'status-indicator-compact status-testing';
+            this.elements.apiKeyStatusIndicator.textContent = '🔄';
+            
+            if (this.elements.aiIntegrationStatus) {
+                this.elements.aiIntegrationStatus.textContent = `Testing ${provider.toUpperCase()} integration...`;
+            }
+            
+            // Test with a simple scene generation request
+            const testPrompt = 'Create a simple pendulum';
+            const response = await fetch('/api/scene/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt: testPrompt,
+                    provider: provider,
+                    api_key: apiKey
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Test successful
+                this.elements.apiKeyStatusIndicator.className = 'status-indicator-compact status-success';
+                this.elements.apiKeyStatusIndicator.textContent = '✅';
+                this.logEvent('AI Test', `${provider.toUpperCase()} integration test successful`);
+                
+                if (this.elements.aiIntegrationStatus) {
+                    this.elements.aiIntegrationStatus.textContent = `${provider.toUpperCase()} integration working correctly!`;
+                }
+            } else {
+                // Test failed
+                this.elements.apiKeyStatusIndicator.className = 'status-indicator-compact status-none';
+                this.elements.apiKeyStatusIndicator.textContent = '❌';
+                this.logEvent('AI Test', `${provider.toUpperCase()} integration test failed: ${result.error || 'Unknown error'}`);
+                
+                if (this.elements.aiIntegrationStatus) {
+                    this.elements.aiIntegrationStatus.textContent = `Test failed: ${result.error || 'Unknown error'}`;
+                }
+            }
+            
+        } catch (error) {
+            console.error('[RemoteViewer] Failed to test AI integration:', error);
+            this.logEvent('Error', `AI integration test failed: ${error.message}`);
+            
+            // Update UI to show error
+            this.elements.apiKeyStatusIndicator.className = 'status-indicator-compact status-none';
+            this.elements.apiKeyStatusIndicator.textContent = '❌';
+            
+            if (this.elements.aiIntegrationStatus) {
+                this.elements.aiIntegrationStatus.textContent = `Test failed: ${error.message}`;
+            }
+        } finally {
+            // Reset button state
+            this.elements.testAiBtn.disabled = !this.elements.aiProviderSelect.value || !this.elements.apiKeyInput.value.trim();
+            this.elements.testAiBtn.textContent = 'Test';
+        }
+    }
+    
+    /**
      * Clear API key configuration
      */
     clearApiKey() {
@@ -1991,17 +2170,34 @@ if __name__ == "__main__":
     updateApiKeyStatus(isConfigured, provider = '') {
         const indicator = this.elements.apiKeyStatusIndicator;
         const clearBtn = this.elements.clearApiKeyBtn;
+        const testBtn = this.elements.testAiBtn;
         
         if (isConfigured) {
             indicator.className = 'status-indicator-compact status-configured';
             indicator.textContent = '✅';
             indicator.title = `${provider.toUpperCase()} API key configured`;
             clearBtn.style.display = 'inline-block';
+            
+            if (testBtn) {
+                testBtn.disabled = false;
+            }
+            
+            if (this.elements.aiIntegrationStatus) {
+                this.elements.aiIntegrationStatus.textContent = `${provider.toUpperCase()} API key configured. Ready for scene generation!`;
+            }
         } else {
             indicator.className = 'status-indicator-compact status-none';
             indicator.textContent = '❌';
             indicator.title = 'No API key configured';
             clearBtn.style.display = 'none';
+            
+            if (testBtn) {
+                testBtn.disabled = true;
+            }
+            
+            if (this.elements.aiIntegrationStatus) {
+                this.elements.aiIntegrationStatus.textContent = 'No AI provider configured. Add API key to enable scene generation.';
+            }
         }
     }
     

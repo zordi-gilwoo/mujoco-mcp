@@ -39,7 +39,7 @@
                 <!-- API Key Configuration Section -->
                 <div class="panel-section api-key-section">
                     <div class="api-key-compact">
-                        <span class="api-key-title">⚠️ AI API Key</span>
+                        <span class="api-key-title">🤖 AI Integration</span>
                         <select id="ai-provider-select" class="provider-dropdown-compact">
                             <option value="">Provider</option>
                             <option value="openai">OpenAI (GPT)</option>
@@ -51,8 +51,12 @@
                                autocomplete="new-password">
                         <button id="toggle-api-key-visibility" class="toggle-visibility-btn-compact" type="button">👁️</button>
                         <button id="save-api-key-btn" class="save-api-key-btn-compact" disabled>Save</button>
+                        <button id="test-ai-btn" class="test-ai-btn-compact" disabled>Test</button>
                         <span id="api-key-status-indicator" class="status-indicator-compact status-none">❌</span>
                         <button id="clear-api-key-btn" class="clear-api-key-btn-compact" style="display: none;">Clear</button>
+                    </div>
+                    <div id="ai-integration-status" class="ai-status-text">
+                        No AI provider configured. Add API key to enable scene generation.
                     </div>
                 </div>
 

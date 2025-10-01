@@ -59,9 +59,164 @@ class SignalingServer:
         self.current_scene_xml = None
         self.menagerie_loader = MenagerieLoader()
 
+        # LLM Integration
+        self.llm_config = {}
+        self.llm_generator = None
+        self._setup_llm_components()
+
         # Metrics reporter will be started when needed
         self._metrics_task = None
         self._command_lock = asyncio.Lock()
+    
+    def _setup_llm_components(self):
+        """Setup LLM integration components."""
+        try:
+            # Import LLM components
+            import sys
+            from pathlib import Path
+            project_root = Path(__file__).parent.parent.parent
+            sys.path.insert(0, str(project_root / "src"))
+            
+            from mujoco_mcp.scene_gen.llm_scene_generator import LLMSceneGenerator
+            from mujoco_mcp.scene_gen.metadata_extractor import MetadataExtractor
+            
+            # Initialize metadata extractor and LLM generator
+            metadata_extractor = MetadataExtractor()
+            self.llm_generator = LLMSceneGenerator(metadata_extractor)
+            print("[SignalingServer] LLM integration components initialized")
+            
+        except Exception as e:
+            print(f"[SignalingServer] LLM integration not available: {e}")
+            self.llm_generator = None
+    
+    async def setup_llm_integration(self, provider: str, api_key: str):
+        """Setup LLM integration with specific provider and API key."""
+        if not self.llm_generator:
+            print("[SignalingServer] LLM generator not available")
+            return False
+        
+        try:
+            self.llm_generator.set_provider_config(provider, api_key)
+            print(f"[SignalingServer] LLM integration configured for {provider}")
+            return True
+        except Exception as e:
+            print(f"[SignalingServer] Failed to configure LLM integration: {e}")
+            return False
+    
+    async def generate_scene_from_prompt(self, prompt: str) -> Dict[str, Any]:
+        """Generate scene XML from natural language prompt using LLM."""
+        if not self.llm_generator:
+            return {
+                "success": False,
+                "error": "LLM integration not available. Using basic scene templates instead.",
+                "scene_xml": self._generate_basic_scene_from_prompt(prompt)
+            }
+        
+        try:
+            # Use LLM to generate scene
+            scene_description = await asyncio.get_event_loop().run_in_executor(
+                None, self.llm_generator.generate_scene_description, prompt
+            )
+            
+            if scene_description and hasattr(scene_description, 'to_xml'):
+                scene_xml = scene_description.to_xml()
+                
+                # Store and broadcast the generated scene
+                self.current_scene_xml = scene_xml
+                await self.broadcast_scene_update(scene_xml)
+                
+                return {
+                    "success": True,
+                    "scene_xml": scene_xml,
+                    "message": "Scene generated successfully using LLM"
+                }
+            else:
+                # Fallback to basic scene generation
+                scene_xml = self._generate_basic_scene_from_prompt(prompt)
+                return {
+                    "success": True,
+                    "scene_xml": scene_xml,
+                    "message": "Scene generated using fallback method"
+                }
+                
+        except Exception as e:
+            print(f"[SignalingServer] LLM scene generation failed: {e}")
+            # Fallback to basic scene generation
+            scene_xml = self._generate_basic_scene_from_prompt(prompt)
+            return {
+                "success": True,
+                "scene_xml": scene_xml,
+                "message": f"LLM generation failed, using fallback: {str(e)}"
+            }
+    
+    def _generate_basic_scene_from_prompt(self, prompt: str) -> str:
+        """Generate basic scene XML from prompt using simple keyword matching."""
+        prompt_lower = prompt.lower()
+        
+        if "pendulum" in prompt_lower:
+            if "double" in prompt_lower:
+                return '''<mujoco>
+    <worldbody>
+        <body name="pole1" pos="0 0 1">
+            <joint name="hinge1" type="hinge" axis="1 0 0"/>
+            <geom name="pole1" type="capsule" size="0.02 0.4" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole2" pos="0 0 -0.4">
+                <joint name="hinge2" type="hinge" axis="1 0 0"/>
+                <geom name="pole2" type="capsule" size="0.02 0.4" rgba="0.2 0.8 0.2 1"/>
+                <body name="mass" pos="0 0 -0.4">
+                    <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                </body>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>'''
+            else:
+                return '''<mujoco>
+    <worldbody>
+        <body name="pendulum" pos="0 0 1">
+            <joint name="hinge" type="hinge" axis="1 0 0"/>
+            <geom name="rod" type="capsule" size="0.02 0.5" rgba="0.8 0.2 0.2 1"/>
+            <body name="bob" pos="0 0 -0.5">
+                <geom name="bob" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>'''
+        elif "cart" in prompt_lower and "pole" in prompt_lower:
+            return '''<mujoco>
+    <worldbody>
+        <body name="cart" pos="0 0 0.1">
+            <joint name="slider" type="slide" axis="1 0 0"/>
+            <geom name="cart" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+            <body name="pole" pos="0 0 0.1">
+                <joint name="hinge" type="hinge" axis="0 1 0"/>
+                <geom name="pole" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>'''
+        elif "box" in prompt_lower or "cube" in prompt_lower:
+            return '''<mujoco>
+    <worldbody>
+        <body name="box" pos="0 0 0.5">
+            <freejoint/>
+            <geom name="box" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+        </body>
+    </worldbody>
+</mujoco>'''
+        else:
+            # Default to simple pendulum
+            return '''<mujoco>
+    <worldbody>
+        <body name="pendulum" pos="0 0 1">
+            <joint name="hinge" type="hinge" axis="1 0 0"/>
+            <geom name="rod" type="capsule" size="0.02 0.5" rgba="0.8 0.2 0.2 1"/>
+            <body name="bob" pos="0 0 -0.5">
+                <geom name="bob" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+            </body>
+        </body>
+    </worldbody>
+</mujoco>'''
     
     async def handle_websocket(self, websocket: WebSocket):
         """Handle a new WebSocket connection for signaling.
@@ -373,6 +528,21 @@ class SignalingServer:
                     message = "Retrieved current simulation state."
 
                 else:
+                    # Try LLM-based scene generation first
+                    if self.llm_generator and any(keyword in command_lower for keyword in ("create", "generate", "make", "build")):
+                        try:
+                            scene_result = await self.generate_scene_from_prompt(trimmed)
+                            if scene_result.get('success') and scene_result.get('scene_xml'):
+                                response_payload["scene_xml"] = scene_result['scene_xml']
+                                actions.append("generated_llm_scene")
+                                message = scene_result.get('message', 'Scene generated using LLM')
+                            else:
+                                return {"success": False, "error": scene_result.get('error', 'Failed to generate scene')}
+                        except Exception as e:
+                            logger.error(f"LLM scene generation failed: {e}")
+                            # Continue to fallback logic below
+                    
+                    # Fallback to builtin scene matching
                     builtin_scene = self._match_builtin_scene(command_lower)
                     if builtin_scene:
                         if builtin_scene == "franka_panda":
@@ -405,11 +575,24 @@ class SignalingServer:
                             actions.append("created_scene")
                             pretty_name = builtin_scene.replace("_", " ")
                             message = f"Loaded built-in {pretty_name} scene."
-                    else:
-                        return {
-                            "success": False,
-                            "error": f"Unsupported command: {trimmed}",
-                        }
+                    elif not actions:  # Only if no action was taken above
+                        # If LLM is available, try to generate scene from any unrecognized command
+                        if self.llm_generator:
+                            try:
+                                scene_result = await self.generate_scene_from_prompt(trimmed)
+                                if scene_result.get('success') and scene_result.get('scene_xml'):
+                                    response_payload["scene_xml"] = scene_result['scene_xml']
+                                    actions.append("generated_llm_scene")
+                                    message = scene_result.get('message', 'Scene generated using LLM')
+                                else:
+                                    return {"success": False, "error": scene_result.get('error', 'Failed to generate scene')}
+                            except Exception as e:
+                                return {"success": False, "error": f"Failed to process command: {str(e)}"}
+                        else:
+                            return {
+                                "success": False,
+                                "error": f"Unsupported command: {trimmed}. LLM integration not available.",
+                            }
 
                 self.stats["events_received"] += 1
                 logger.info("Processed text command '%s' -> %s", trimmed, message)

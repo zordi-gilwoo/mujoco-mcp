@@ -187,6 +187,60 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
         except Exception as e:
             logger.error(f"Error loading scene: {e}")
             return JSONResponse({"error": str(e)}, status_code=500)
+
+    @app.post("/api/config/api-key")
+    async def save_api_key(request: Request):
+        """Save API key configuration for LLM providers."""
+        try:
+            data = await request.json()
+            provider = data.get('provider')
+            api_key = data.get('api_key')
+            
+            if not provider or not api_key:
+                return JSONResponse({"error": "Provider and API key are required"}, status_code=400)
+            
+            # Store API key configuration in signaling server
+            if not hasattr(signaling_server, 'llm_config'):
+                signaling_server.llm_config = {}
+            
+            signaling_server.llm_config[provider] = {
+                'api_key': api_key,
+                'provider': provider
+            }
+            
+            # Initialize or update LLM integration
+            await signaling_server.setup_llm_integration(provider, api_key)
+            
+            return JSONResponse({
+                "success": True,
+                "message": f"API key configured for {provider}"
+            })
+            
+        except Exception as e:
+            logger.error(f"Error saving API key: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    @app.post("/api/scene/generate")
+    async def generate_scene(request: Request):
+        """Generate scene from natural language prompt using LLM."""
+        try:
+            data = await request.json()
+            prompt = data.get('prompt')
+            
+            if not prompt:
+                return JSONResponse({"error": "Prompt is required"}, status_code=400)
+            
+            # Generate scene using LLM integration
+            result = await signaling_server.generate_scene_from_prompt(prompt)
+            
+            if result.get('success'):
+                return JSONResponse(result)
+            else:
+                return JSONResponse(result, status_code=400)
+            
+        except Exception as e:
+            logger.error(f"Error generating scene: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
     
     @app.websocket("/ws/signaling")
     async def websocket_signaling(websocket: WebSocket):
