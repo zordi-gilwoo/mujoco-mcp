@@ -24,6 +24,13 @@ import mcp.types as types
 from .version import __version__
 from .viewer_client import MuJoCoViewerClient as ViewerClient
 from .menagerie_loader import MenagerieLoader
+from .scene_gen import (
+    SceneDescription,
+    MetadataExtractor,
+    ConstraintSolver, 
+    SceneXMLBuilder,
+    LLMSceneGenerator
+)
 from .session_manager import session_manager
 from .process_manager import process_manager
 from .file_handler import FileHandler
@@ -38,6 +45,12 @@ server = Server("mujoco-mcp-menagerie")
 # Global instances
 menagerie_loader = MenagerieLoader()
 file_handler = FileHandler()
+
+# Scene generation instances
+metadata_extractor = MetadataExtractor()
+constraint_solver = ConstraintSolver(metadata_extractor)
+xml_builder = SceneXMLBuilder(metadata_extractor)
+llm_generator = LLMSceneGenerator(metadata_extractor)  # Phase 2C: Pass metadata for symbolic plans
 
 @server.list_tools()
 async def handle_list_tools() -> List[types.Tool]:
@@ -96,6 +109,30 @@ async def handle_list_tools() -> List[types.Tool]:
                     }
                 },
                 "required": ["model_name"]
+            }
+        ),
+        types.Tool(
+            name="create_structured_scene",
+            description="Create a structured scene from JSON description or natural language",
+            inputSchema={
+                "$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "scene_description_json": {
+                        "type": "string",
+                        "description": "JSON string containing structured scene description"
+                    },
+                    "natural_language": {
+                        "type": "string",
+                        "description": "Natural language description of desired scene"
+                    },
+                    "dry_run": {
+                        "type": "boolean",
+                        "description": "If true, validate and return summary without loading viewer",
+                        "default": False
+                    }
+                },
+                "additionalProperties": False
             }
         ),
         types.Tool(
@@ -538,6 +575,9 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     "description": "Control MuJoCo physics simulations with Menagerie model support",
                     "status": "ready",
                     "capabilities": [
+                        "create_structured_scene", "create_scene", "create_menagerie_scene", 
+                        "list_menagerie_models", "validate_menagerie_model", "step_simulation", 
+                        "get_state", "reset", "close_viewer"
                         "create_scene", "create_menagerie_scene", "list_menagerie_models",
                         "validate_menagerie_model", "step_simulation", "get_state", 
                         "reset", "close_viewer", "download_xml", "download_python_script",
@@ -546,6 +586,125 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     "menagerie_support": True
                 }, indent=2)
             )]
+            
+        elif name == "create_structured_scene":
+            scene_description_json = arguments.get("scene_description_json")
+            natural_language = arguments.get("natural_language")
+            dry_run = arguments.get("dry_run", False)
+            
+            try:
+                # Determine input method
+                if scene_description_json:
+                    # Parse JSON directly
+                    try:
+                        scene_dict = json.loads(scene_description_json)
+                        scene = SceneDescription(**scene_dict)
+                        logger.info("Using provided JSON scene description")
+                    except (json.JSONDecodeError, Exception) as e:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"❌ Failed to parse scene description JSON: {str(e)}"
+                        )]
+                elif natural_language:
+                    # Generate scene from natural language
+                    try:
+                        scene_dict = llm_generator.generate_or_stub(natural_language)
+                        scene = SceneDescription(**scene_dict)
+                        logger.info(f"Generated scene from natural language: '{natural_language}'")
+                    except Exception as e:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"❌ Failed to generate scene from natural language: {str(e)}"
+                        )]
+                else:
+                    return [types.TextContent(
+                        type="text",
+                        text="❌ Either 'scene_description_json' or 'natural_language' must be provided"
+                    )]
+                
+                # Solve constraints
+                try:
+                    poses = constraint_solver.solve(scene)
+                    logger.info(f"Successfully solved constraints for {len(poses)} entities")
+                except Exception as e:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Constraint solving failed: {str(e)}"
+                    )]
+                
+                # Build XML
+                try:
+                    scene_xml = xml_builder.build_scene(scene, poses, "structured_scene")
+                    
+                    # Validate XML
+                    if not xml_builder.validate_xml(scene_xml):
+                        return [types.TextContent(
+                            type="text",
+                            text="❌ Generated XML is invalid"
+                        )]
+                    
+                    logger.info(f"Successfully built XML scene ({len(scene_xml)} characters)")
+                except Exception as e:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ XML generation failed: {str(e)}"
+                    )]
+                
+                # Prepare response
+                summary = {
+                    "scene_entities": len(poses),
+                    "objects": len(scene.objects),
+                    "robots": len(scene.robots),
+                    "solved_poses": {entity_id: {
+                        "position": pose.position.tolist(),
+                        "orientation": pose.orientation.tolist()
+                    } for entity_id, pose in poses.items()},
+                    "xml_length": len(scene_xml)
+                }
+                
+                if dry_run:
+                    # Return summary without loading viewer
+                    return [types.TextContent(
+                        type="text",
+                        text=f"✅ Structured scene validation successful!\n\n{json.dumps(summary, indent=2)}\n\nXML Preview (first 500 chars):\n{scene_xml[:500]}{'...' if len(scene_xml) > 500 else ''}"
+                    )]
+                
+                # Load scene in viewer
+                if not viewer_client:
+                    viewer_client = ViewerClient()
+                
+                if not viewer_client.connected:
+                    success = viewer_client.connect()
+                    if not success:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"❌ Failed to connect to MuJoCo viewer server. Scene generated successfully but cannot display.\n\n{json.dumps(summary, indent=2)}"
+                        )]
+                
+                # Load the scene
+                response = viewer_client.send_command({
+                    "type": "load_model",
+                    "model_id": "structured_scene",
+                    "model_xml": scene_xml
+                })
+                
+                if response.get("success"):
+                    return [types.TextContent(
+                        type="text",
+                        text=f"✅ Structured scene created successfully!\n\n{json.dumps(summary, indent=2)}\n\nViewer window opened with generated scene."
+                    )]
+                else:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Failed to load scene in viewer: {response.get('error', 'Unknown error')}\n\n{json.dumps(summary, indent=2)}"
+                    )]
+                    
+            except Exception as e:
+                logger.exception(f"Error in create_structured_scene")
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Structured scene generation failed: {str(e)}"
+                )]
             
         elif name == "list_menagerie_models":
             category_filter = arguments.get("category")

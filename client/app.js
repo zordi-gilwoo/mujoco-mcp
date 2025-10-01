@@ -1881,7 +1881,15 @@ if __name__ == "__main__":
         if (provider) {
             // Clear the API key input when changing providers
             this.elements.apiKeyInput.value = '';
-            this.elements.apiKeyInput.placeholder = `Enter your ${provider.toUpperCase()} API key...`;
+            
+            // Update placeholder based on provider
+            const placeholders = {
+                'openai': 'Enter your OpenAI API key (sk-...)',
+                'claude': 'Enter your Claude API key (sk-ant-...)',
+                'gemini': 'Enter your Gemini API key (AIza...)'
+            };
+            
+            this.elements.apiKeyInput.placeholder = placeholders[provider] || `Enter your ${provider.toUpperCase()} API key...`;
             this.handleApiKeyInputChange();
         } else {
             this.elements.apiKeyInput.placeholder = 'Select a provider first...';
@@ -2002,13 +2010,22 @@ if __name__ == "__main__":
      */
     async updateBackendApiKey(provider, apiKey) {
         try {
+            // Map UI provider names to backend environment variable names
+            const providerMapping = {
+                'openai': 'openai',
+                'claude': 'claude', 
+                'gemini': 'gemini'
+            };
+            
+            const backendProvider = providerMapping[provider] || provider;
+            
             const response = await fetch('/api/config/api-key', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    provider: provider,
+                    provider: backendProvider,
                     api_key: apiKey
                 })
             });

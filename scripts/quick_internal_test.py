@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-快速内测脚本 - 验证核心功能
+Quick internal test script - Verify core functionality
 """
 
 import asyncio
@@ -42,7 +42,7 @@ async def test_core_functionality():
     print("\n2. Testing tools list...")
     try:
         tools = await handle_list_tools()
-        print(f"   ✅ Found {len(tools)}  tools:")
+        print(f"   ✅ Found {len(tools)} tools:")
         for tool in tools:
             print(f"      - {tool.name}: {tool.description[:50]}...")
         results["tools_test"] = True
@@ -55,7 +55,7 @@ async def test_core_functionality():
         result = await handle_call_tool("get_server_info", {})
         if result and len(result) > 0:
             print("   ✅ Server info retrieved successfully")
-            print(f"      Response length: {len(result[0].text)}  characters")
+            print(f"      Response length: {len(result[0].text)} characters")
             results["mcp_protocol_test"] = True
         else:
             print("   ❌ Server info response is empty")
