@@ -1,0 +1,26 @@
+# MuJoCo Remote Viewer Dependencies
+# Core web framework and server
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+starlette>=0.27.0
+
+# WebRTC support
+aiortc>=1.6.0
+av>=10.0.0
+
+# Async utilities
+asyncio-mqtt>=0.14.0
+
+# Data processing
+numpy>=1.22.0
+pydantic>=2.0.0
+
+# For future MuJoCo integration
+mujoco>=2.3.0
+
+# Development dependencies (optional)
+# Uncomment if you want these available
+# pytest>=7.0.0
+# pytest-asyncio>=0.21.0
+# black>=23.0.0
+# ruff>=0.1.0

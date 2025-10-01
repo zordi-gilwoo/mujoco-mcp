@@ -1,12 +1,12 @@
 """
-v0.8 basic tests - simplified version, focus on core functionality
+v0.8 基础测试 - 简化版本，专注于核心功能
 """
 
 import pytest
 
 
 def test_package_import():
-    """Test package import"""
+    """测试包导入"""
     try:
         import mujoco_mcp
         from mujoco_mcp.version import __version__
@@ -17,7 +17,7 @@ def test_package_import():
 
 
 def test_mcp_server_import():
-    """Test MCP server import"""
+    """测试MCP服务器导入"""
     try:
         from mujoco_mcp.mcp_server import handle_list_tools, handle_call_tool
 
@@ -29,7 +29,7 @@ def test_mcp_server_import():
 
 @pytest.mark.asyncio
 async def test_tools_listing():
-    """Test tools listing functionality"""
+    """测试工具列表功能"""
     from mujoco_mcp.mcp_server import handle_list_tools
 
     tools = await handle_list_tools()
@@ -51,7 +51,7 @@ async def test_tools_listing():
 
 @pytest.mark.asyncio
 async def test_server_info_tool():
-    """Test server info tool"""
+    """测试服务器信息工具"""
     from mujoco_mcp.mcp_server import handle_call_tool
 
     result = await handle_call_tool("get_server_info", {})

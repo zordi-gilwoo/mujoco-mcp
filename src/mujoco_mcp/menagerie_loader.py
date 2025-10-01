@@ -19,9 +19,30 @@ class MenagerieLoader:
     
     BASE_URL = "https://raw.githubusercontent.com/google-deepmind/mujoco_menagerie/main"
     
-    def __init__(self, cache_dir: Optional[str] = None):
+    def __init__(self, cache_dir: Optional[str] = None, menagerie_root: Optional[str] = None):
         self.cache_dir = Path(cache_dir) if cache_dir else Path(tempfile.gettempdir()) / "mujoco_menagerie"
         self.cache_dir.mkdir(exist_ok=True)
+
+        env_root = menagerie_root or os.environ.get("MUJOCO_MENAGERIE_PATH")
+        self.menagerie_root: Optional[Path] = None
+        if env_root:
+            candidate = Path(env_root).expanduser()
+            if candidate.exists():
+                self.menagerie_root = candidate
+            else:
+                logger.warning(
+                    "MUJOCO_MENAGERIE_PATH set to %s, but directory does not exist", candidate
+                )
+
+        if self.menagerie_root is None:
+            base_path = Path(__file__).resolve()
+            repo_candidate = base_path.parents[2] / "mujoco_menagerie"
+            if repo_candidate.exists():
+                self.menagerie_root = repo_candidate
+            else:
+                sibling_candidate = base_path.parents[3] / "mujoco_menagerie"
+                if sibling_candidate.exists():
+                    self.menagerie_root = sibling_candidate
         
     def download_file(self, model_name: str, file_path: str) -> str:
         """Download a file from the Menagerie repository"""
@@ -59,48 +80,57 @@ class MenagerieLoader:
             return xml_content
         
         # Find all include elements
-        includes = root.findall('.//include')
-        
-        for include in includes:
-            file_attr = include.get('file')
-            if not file_attr:
-                continue
-            
-            # Avoid circular includes
-            if file_attr in visited:
-                logger.warning(f"Circular include detected: {file_attr}")
-                continue
-            
-            visited.add(file_attr)
-            
-            try:
-                # Download included file
-                included_content = self.download_file(model_name, file_attr)
-                
-                # Recursively resolve includes in the included file
-                included_content = self.resolve_includes(included_content, model_name, visited.copy())
-                
-                # Parse included content
-                included_root = ET.fromstring(included_content)
-                
-                # Replace include element with included content
-                parent = root.find(f".//*[include[@file='{file_attr}']]")
-                if parent is not None:
-                    include_idx = list(parent).index(include)
-                    parent.remove(include)
-                    
-                    # Insert all children of included root
-                    for i, child in enumerate(included_root):
-                        parent.insert(include_idx + i, child)
-                        
-            except Exception as e:
-                logger.warning(f"Failed to resolve include {file_attr}: {e}")
-                # Keep the include element as-is if we can't resolve it
-                continue
+        for parent in list(root.iter()):
+            children = list(parent)
+            for idx, include in enumerate(children):
+                if include.tag != 'include':
+                    continue
+
+                file_attr = include.get('file')
+                if not file_attr:
+                    continue
+
+                if file_attr in visited:
+                    logger.warning(f"Circular include detected: {file_attr}")
+                    continue
+
+                include_path = self._ensure_file_path(model_name, file_attr)
+                if include_path is None:
+                    logger.warning(f"Failed to resolve include {file_attr}: file not found")
+                    continue
+
+                try:
+                    included_content = include_path.read_text()
+                except Exception as exc:
+                    logger.warning(f"Failed to read include {file_attr}: {exc}")
+                    continue
+
+                nested_visited = visited.copy()
+                nested_visited.add(file_attr)
+                included_content = self.resolve_includes(included_content, model_name, nested_visited)
+
+                try:
+                    included_root = ET.fromstring(included_content)
+                except ET.ParseError as exc:
+                    logger.warning(f"Failed to parse include {file_attr}: {exc}")
+                    continue
+
+                # Remove the include placeholder
+                parent.remove(include)
+
+                # Merge root attributes when including full <mujoco> documents
+                if parent is root and included_root.tag == 'mujoco':
+                    for key, value in included_root.attrib.items():
+                        parent.attrib.setdefault(key, value)
+
+                insert_idx = idx
+                for child in list(included_root):
+                    parent.insert(insert_idx, child)
+                    insert_idx += 1
         
         # Return modified XML
         return ET.tostring(root, encoding='unicode')
-    
+
     def get_model_xml(self, model_name: str) -> str:
         """Get complete XML for a Menagerie model with includes resolved"""
         
@@ -113,8 +143,11 @@ class MenagerieLoader:
         
         for xml_file in possible_files:
             try:
-                # Download main XML file
-                xml_content = self.download_file(model_name, xml_file)
+                file_path = self._ensure_file_path(model_name, xml_file)
+                if file_path is None:
+                    continue
+
+                xml_content = file_path.read_text()
                 
                 # Resolve includes
                 resolved_xml = self.resolve_includes(xml_content, model_name)
@@ -127,6 +160,50 @@ class MenagerieLoader:
                 continue
         
         raise Exception(f"Could not load any XML files for model {model_name}")
+
+    def _ensure_file_path(self, model_name: str, file_path: str) -> Optional[Path]:
+        """Return a filesystem path for a menagerie asset, downloading if necessary."""
+
+        if self.menagerie_root:
+            local_path = self.menagerie_root / model_name / file_path
+            if local_path.exists():
+                return local_path
+
+        cache_path = self.cache_dir / model_name / file_path
+        if cache_path.exists():
+            return cache_path
+
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            content = self.download_file(model_name, file_path)
+        except Exception as exc:
+            logger.debug(f"Failed to fetch {model_name}/{file_path}: {exc}")
+            return None
+
+        # download_file already wrote the content to cache_path
+        return cache_path if content is not None else None
+
+    def get_model_file(self, model_name: str) -> Path:
+        """Locate the primary XML file for a menagerie model.
+
+        Prefers the local menagerie checkout when available, falling back to the
+        downloader cache. Raises FileNotFoundError if no XML can be located.
+        """
+
+        candidates = [
+            "scene.xml",
+            f"{model_name}.xml",
+            f"{model_name}_mjx.xml",
+        ]
+
+        for candidate in candidates:
+            path = self._ensure_file_path(model_name, candidate)
+            if path is not None:
+                return path
+
+        raise FileNotFoundError(
+            f"No XML found for menagerie model '{model_name}'."
+        )
     
     def get_available_models(self) -> Dict[str, List[str]]:
         """Get list of available models by category (cached/hardcoded for performance)"""
@@ -209,7 +286,8 @@ class MenagerieLoader:
     
     def create_scene_xml(self, model_name: str, scene_name: Optional[str] = None) -> str:
         """Create a complete scene XML for a Menagerie model"""
-        model_xml = self.get_model_xml(model_name)
+        model_path = self.get_model_file(model_name)
+        model_xml = model_path.read_text()
         
         # If the model XML is already a complete scene, return it
         if "<worldbody>" in model_xml and "<mujoco>" in model_xml:

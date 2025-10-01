@@ -136,6 +136,7 @@ Thumbs.db
 # MuJoCo specific
 *.mjb
 *.log
+MUJOCO_LOG.TXT
 
 # Project specific
 /tmp/

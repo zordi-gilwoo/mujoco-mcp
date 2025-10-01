@@ -15,12 +15,14 @@
 ## 🌟 Features
 
 ### Core Capabilities
+
 - **Natural Language Control**: Control robots using plain English commands
 - **Real-time Visualization**: Native MuJoCo viewer with interactive GUI
 - **MCP Standard Compliance**: Full Model Context Protocol implementation
 - **Cross-Platform Support**: Works on macOS, Linux, and Windows
 
 ### Advanced Features (v0.8.2)
+
 - **🎛️ Advanced Control Algorithms**: PID, trajectory planning, optimization control
 - **🤖 Multi-Robot Coordination**: Formation control, cooperative manipulation
 - **🔬 Sensor Feedback Systems**: Closed-loop control with multi-modal sensors
@@ -28,6 +30,9 @@
 - **📊 Physics Benchmarking**: Performance, accuracy, and scalability testing
 - **📈 Real-time Monitoring**: Advanced visualization and analytics tools
 - **🚀 Production Ready**: Enhanced server with connection pooling and diagnostics
+- **🔀 Process Pool Architecture**: Isolated processes for true multi-client support
+- **🔌 Automatic Port Allocation**: Dynamic port management prevents conflicts
+- **💾 Session Management**: Complete client isolation and resource cleanup
 
 ## Quick Start
 
@@ -70,6 +75,7 @@ Add to your Claude Desktop config:
 ### 5. Start Using Natural Language Commands
 
 In Claude Desktop:
+
 ```
 "Create a pendulum simulation"
 "Set the pendulum angle to 45 degrees"
@@ -80,6 +86,10 @@ In Claude Desktop:
 ## 📝 Example Usage
 
 ### Basic Physics Simulations
+<<<<<<< HEAD
+=======
+
+>>>>>>> fix-c471
 ```
 # Simple pendulum
 "Create a pendulum simulation"
@@ -95,6 +105,10 @@ In Claude Desktop:
 ```
 
 ### Advanced Robot Control
+<<<<<<< HEAD
+=======
+
+>>>>>>> fix-c471
 ```
 # Load robot from MuJoCo Menagerie
 "Load a Franka Panda robot"
@@ -111,6 +125,10 @@ In Claude Desktop:
 ```
 
 ### Reinforcement Learning
+<<<<<<< HEAD
+=======
+
+>>>>>>> fix-c471
 ```python
 from mujoco_mcp.rl_integration import create_reaching_env
 
@@ -139,6 +157,7 @@ for _ in range(1000):
 | `execute_command` | Natural language | `{"command": "move arm up"}` |
 | `get_loaded_models` | List active models | Returns all loaded models |
 | `close_viewer` | Close GUI window | Closes visualization |
+<<<<<<< HEAD
 
 ## 🚀 Advanced Setup
 
@@ -149,12 +168,83 @@ export MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
 ```
 
 ### Use Enhanced Production Server
+=======
+| `get_session_info` | Session and model info | Returns current session details |
+| `get_process_pool_stats` | Process pool status | Returns process pool statistics |
+| `list_active_processes` | Active processes | Lists all running viewer processes |
+| `terminate_process` | Terminate process | `{"session_id": "session_123"}` |
+
+## 🚀 Advanced Setup
+
+### Process-Based Multi-Client Architecture
+
+MuJoCo MCP uses a process-based architecture where each client gets a dedicated viewer process:
+
+```python
+# Each client gets dedicated viewer process with complete isolation
+from mujoco_mcp.session_manager import SessionManager
+
+session_manager = SessionManager()
+# - Dedicated viewer process (PID isolation)
+# - Automatic port allocation (8001-9000)
+# - Independent memory space
+# - Complete crash isolation
+# - Automatic cleanup on disconnect
+```
+
+**Key Benefits:**
+
+- 🔒 **Complete Isolation**: Memory and process separation between clients
+- 🔌 **Auto Port Management**: Dynamic port allocation and conflict prevention
+- 📊 **Health Monitoring**: Background process monitoring and auto-restart
+- 🧹 **Automatic Cleanup**: Resources freed on client disconnect
+- 🚀 **Enterprise Scale**: Support for hundreds of concurrent clients
+- 🛡️ **Crash Protection**: One client failure doesn't affect others
+
+**Process Management MCP Tools:**
+
+- `get_process_pool_stats` - Process pool statistics and health
+- `list_active_processes` - Show all running viewer processes
+- `terminate_process` - Manually terminate specific processes
+
+**Demo Application:**
+
+```bash
+# Run the multi-client process-based demo
+python demo_multi_client_process_based.py
+```
+
+See [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for technical details.
+
+### Install MuJoCo Menagerie (for robot models)
+
+```bash
+# Clone the menagerie (or use your existing location)
+git clone https://github.com/google-deepmind/mujoco_menagerie.git /path/to/mujoco_menagerie
+
+# Persist the path in your conda env (Option 1 - recommended)
+conda activate mujoco
+conda env config vars set MUJOCO_MENAGERIE_PATH=/absolute/path/to/mujoco_menagerie
+conda deactivate && conda activate mujoco
+
+# Verify
+conda env config vars list | grep MUJOCO_MENAGERIE_PATH
+echo "$MUJOCO_MENAGERIE_PATH"
+```
+
+### Use Enhanced Production Server
+
+>>>>>>> fix-c471
 ```bash
 # For better performance and reliability
 /opt/miniconda3/bin/mjpython mujoco_viewer_server_enhanced.py --port 8888
 ```
 
 ### Run Comprehensive Tests
+<<<<<<< HEAD
+=======
+
+>>>>>>> fix-c471
 ```bash
 # Test basic functionality
 python scripts/quick_internal_test.py
