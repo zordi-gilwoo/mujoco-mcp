@@ -46,6 +46,12 @@ Welcome to the MuJoCo MCP documentation. This index provides a comprehensive ove
   - Scene parameters
   - Custom scene creation
 
+- **[WebRTC Viewer Guide](docs/WEBRTC_VIEWER_GUIDE.md)**
+  - Browser-based real-time simulation viewer
+  - LLM-powered scene creation
+  - Multi-client collaboration
+  - API reference and deployment
+
 - **[ADVANCED_FEATURES_GUIDE.md](ADVANCED_FEATURES_GUIDE.md)**
   - Advanced control algorithms
   - Multi-robot coordination
