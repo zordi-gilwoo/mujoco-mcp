@@ -190,6 +190,39 @@ class ConstraintSolver:
         logger.info("Applying enhanced collision resolution with global optimization")
         poses = self.collision_optimizer.optimize_poses(scene, poses)
         
+        # Validate collision resolution worked correctly
+        collision_constraints = []
+        for entity_id in scene.get_all_entity_ids():
+            constraints = scene.get_constraints_for_entity(entity_id)
+            for constraint in constraints:
+                if constraint.type == "no_collision":
+                    collision_constraints.append(constraint)
+        
+        # Check if any collisions still exist
+        unresolved_collisions = False
+        for constraint in collision_constraints:
+            subject_id = constraint.subject
+            reference_id = constraint.reference
+            
+            if subject_id in poses and reference_id in poses:
+                subject_metadata = self._get_entity_metadata(subject_id, scene)
+                reference_metadata = self._get_entity_metadata(reference_id, scene)
+                
+                subject_aabb = AABBBox.from_metadata(subject_metadata, poses[subject_id])
+                reference_aabb = AABBBox.from_metadata(reference_metadata, poses[reference_id])
+                
+                if subject_aabb.overlaps(reference_aabb):
+                    # Calculate actual distance
+                    distance = np.linalg.norm(poses[subject_id].position - poses[reference_id].position)
+                    if distance < constraint.clearance:
+                        logger.warning(f"Enhanced collision resolution failed for {subject_id} and {reference_id}, distance: {distance:.6f}, required: {constraint.clearance}")
+                        unresolved_collisions = True
+        
+        # If enhanced collision resolution failed, apply basic collision resolution as fallback
+        if unresolved_collisions:
+            logger.info("Applying basic collision resolution as fallback")
+            self._resolve_collision_constraints_basic(scene, poses)
+        
         # Phase 4: Enhance placement with spatial reasoning (Phase 2B)
         logger.info("Applying advanced spatial reasoning enhancements")
         poses = self._enhance_poses_with_spatial_reasoning(scene, poses)
@@ -427,7 +460,7 @@ class ConstraintSolver:
         
         return position
     
-    def _resolve_collisions(self, scene: SceneDescription, poses: Dict[str, Pose]):
+    def _resolve_collision_constraints_basic(self, scene: SceneDescription, poses: Dict[str, Pose]):
         """Resolve collision constraints using iterative AABB pushing."""
         # Collect all no_collision constraints
         collision_constraints = []

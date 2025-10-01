@@ -60,7 +60,10 @@ class LLMSceneGenerator:
         Raises:
             NotImplementedError: If LLM integration is enabled but not implemented
         """
-        return self._generate_with_symbolic_plan(prompt)
+        if self.llm_enabled:
+            return self._generate_with_llm(prompt)
+        else:
+            return self._generate_with_symbolic_plan(prompt)
     
     def _generate_with_symbolic_plan(self, prompt: str) -> SceneDescription:
         """
