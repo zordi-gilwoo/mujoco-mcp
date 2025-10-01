@@ -33,16 +33,19 @@ class LLMSceneGenerator:
     def __init__(self, metadata_extractor=None):
         # LLM configuration
         self.llm_enabled = os.getenv("STRUCTURED_SCENE_LLM", "disabled").lower() == "enabled"
-        self.api_key = os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("OPENAI_MODEL", "gpt-4")
-        self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
-        self.temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+        
+        # Multi-provider support
+        self.provider = os.getenv("LLM_PROVIDER", "openai").lower()
+        self.supported_providers = ["openai", "claude", "gemini"]
+        
+        # Provider-specific configuration
+        self._setup_provider_config()
         
         if self.llm_enabled:
             if self.api_key:
-                logger.info(f"LLM integration enabled - using model {self.model}")
+                logger.info(f"LLM integration enabled - using {self.provider} with model {self.model}")
             else:
-                logger.warning("LLM integration enabled but OPENAI_API_KEY not found - will use symbolic plans")
+                logger.warning(f"LLM integration enabled but {self.provider.upper()}_API_KEY not found - will use symbolic plans")
                 self.llm_enabled = False
         else:
             logger.info("LLM integration disabled - using symbolic plan generation")
@@ -54,6 +57,50 @@ class LLMSceneGenerator:
             logger.info("Symbolic plan interface initialized for NL→Plan→Scene pipeline")
         else:
             raise ValueError("MetadataExtractor is required for enhanced scene generation")
+    
+    def _setup_provider_config(self):
+        """Setup configuration for the selected LLM provider."""
+        if self.provider == "openai":
+            self.api_key = os.getenv("OPENAI_API_KEY")
+            self.model = os.getenv("OPENAI_MODEL", "gpt-4")
+            self.max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
+            self.temperature = float(os.getenv("OPENAI_TEMPERATURE", "0.7"))
+        elif self.provider == "claude":
+            self.api_key = os.getenv("CLAUDE_API_KEY") or os.getenv("ANTHROPIC_API_KEY")
+            self.model = os.getenv("CLAUDE_MODEL", "claude-3-sonnet-20241022")
+            self.max_tokens = int(os.getenv("CLAUDE_MAX_TOKENS", "2000"))
+            self.temperature = float(os.getenv("CLAUDE_TEMPERATURE", "0.7"))
+        elif self.provider == "gemini":
+            self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            self.model = os.getenv("GEMINI_MODEL", "gemini-1.5-pro")
+            self.max_tokens = int(os.getenv("GEMINI_MAX_TOKENS", "2000"))
+            self.temperature = float(os.getenv("GEMINI_TEMPERATURE", "0.7"))
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}. Supported: {self.supported_providers}")
+    
+    def set_provider_config(self, provider: str, api_key: str, model: str = None):
+        """Dynamically set provider configuration (for UI integration)."""
+        if provider.lower() not in self.supported_providers:
+            raise ValueError(f"Unsupported provider: {provider}. Supported: {self.supported_providers}")
+        
+        self.provider = provider.lower()
+        self.api_key = api_key
+        
+        # Set default models if not specified
+        if model:
+            self.model = model
+        else:
+            if self.provider == "openai":
+                self.model = "gpt-4"
+            elif self.provider == "claude":
+                self.model = "claude-3-sonnet-20241022"
+            elif self.provider == "gemini":
+                self.model = "gemini-1.5-pro"
+        
+        # Enable LLM if API key is provided
+        self.llm_enabled = bool(self.api_key)
+        
+        logger.info(f"Provider configuration updated: {self.provider} with model {self.model}")
     
     def generate_scene_description(self, prompt: str) -> SceneDescription:
         """
@@ -127,24 +174,36 @@ class LLMSceneGenerator:
     
     def _generate_with_llm(self, prompt: str) -> SceneDescription:
         """
-        Generate scene using real LLM integration with API key support.
+        Generate scene using real LLM integration with multi-provider support.
         
-        Supports OpenAI API and other LLM services through environment variables.
+        Supports OpenAI, Claude (Anthropic), and Gemini APIs.
         """
         # Check for API key
         if not self.api_key:
-            logger.error("OPENAI_API_KEY environment variable not set")
+            logger.error(f"{self.provider.upper()}_API_KEY environment variable not set")
             raise ValueError(
-                "LLM integration enabled but no API key found. "
-                "Please set OPENAI_API_KEY environment variable."
+                f"LLM integration enabled but no API key found. "
+                f"Please set {self.provider.upper()}_API_KEY environment variable."
             )
         
+        # Route to appropriate provider
+        if self.provider == "openai":
+            return self._generate_with_openai(prompt)
+        elif self.provider == "claude":
+            return self._generate_with_claude(prompt)
+        elif self.provider == "gemini":
+            return self._generate_with_gemini(prompt)
+        else:
+            raise ValueError(f"Unsupported provider: {self.provider}")
+    
+    def _generate_with_openai(self, prompt: str) -> SceneDescription:
+        """Generate scene using OpenAI API."""
         try:
             import openai
         except ImportError:
             logger.error("OpenAI package not installed")
             raise ImportError(
-                "OpenAI package required for LLM integration. "
+                "OpenAI package required for OpenAI integration. "
                 "Install with: pip install openai"
             )
         
@@ -153,15 +212,7 @@ class LLMSceneGenerator:
         
         # Build structured prompt for scene generation
         system_prompt = self._get_system_prompt()
-        user_message = f"""Natural Language Request: "{prompt}"
-
-Please generate a complete scene description that fulfills this request. Consider:
-- What objects are needed for the described scenario
-- How objects should be spatially related 
-- Whether robots are needed and how they should be positioned
-- What constraints ensure a realistic, functional layout
-
-Return only the JSON scene description without any additional text or formatting."""
+        user_message = self._build_user_message(prompt)
         
         try:
             logger.info(f"Calling OpenAI API ({self.model}) for scene generation: {prompt[:50]}...")
@@ -178,35 +229,138 @@ Return only the JSON scene description without any additional text or formatting
             
             # Extract and parse JSON response
             llm_response = response.choices[0].message.content.strip()
-            logger.info(f"Received LLM response ({len(llm_response)} chars)")
+            logger.info(f"Received OpenAI response ({len(llm_response)} chars)")
             
-            # Clean up response (remove markdown code blocks if present)
-            if llm_response.startswith("```json"):
-                llm_response = llm_response[7:-3].strip()
-            elif llm_response.startswith("```"):
-                llm_response = llm_response[3:-3].strip()
-            
-            # Parse JSON response
-            try:
-                scene_dict = json.loads(llm_response)
-                scene = SceneDescription(**scene_dict)
-                logger.info(f"Successfully generated scene with {len(scene.objects)} objects and {len(scene.robots)} robots")
-                return scene
-                
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error(f"Failed to parse LLM response as valid scene: {e}")
-                logger.debug(f"Raw LLM response: {llm_response}")
-                
-                # Fallback to symbolic plan generation
-                logger.info("Falling back to symbolic plan generation")
-                return self._generate_with_symbolic_plan(prompt)
+            return self._parse_llm_response(llm_response, prompt)
                 
         except Exception as e:
             logger.error(f"OpenAI API call failed: {e}")
+            logger.info("Falling back to symbolic plan generation")
+            return self._generate_with_symbolic_plan(prompt)
+    
+    def _generate_with_claude(self, prompt: str) -> SceneDescription:
+        """Generate scene using Claude (Anthropic) API."""
+        try:
+            import anthropic
+        except ImportError:
+            logger.error("Anthropic package not installed")
+            raise ImportError(
+                "Anthropic package required for Claude integration. "
+                "Install with: pip install anthropic"
+            )
+        
+        # Initialize Anthropic client
+        client = anthropic.Anthropic(api_key=self.api_key)
+        
+        # Build structured prompt for scene generation
+        system_prompt = self._get_system_prompt()
+        user_message = self._build_user_message(prompt)
+        
+        try:
+            logger.info(f"Calling Claude API ({self.model}) for scene generation: {prompt[:50]}...")
+            
+            response = client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                system=system_prompt,
+                messages=[
+                    {"role": "user", "content": user_message}
+                ]
+            )
+            
+            # Extract and parse JSON response
+            llm_response = response.content[0].text.strip()
+            logger.info(f"Received Claude response ({len(llm_response)} chars)")
+            
+            return self._parse_llm_response(llm_response, prompt)
+                
+        except Exception as e:
+            logger.error(f"Claude API call failed: {e}")
+            logger.info("Falling back to symbolic plan generation")
+            return self._generate_with_symbolic_plan(prompt)
+    
+    def _generate_with_gemini(self, prompt: str) -> SceneDescription:
+        """Generate scene using Google Gemini API."""
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            logger.error("Google GenerativeAI package not installed")
+            raise ImportError(
+                "Google GenerativeAI package required for Gemini integration. "
+                "Install with: pip install google-generativeai"
+            )
+        
+        # Configure Gemini
+        genai.configure(api_key=self.api_key)
+        
+        # Initialize model
+        model = genai.GenerativeModel(self.model)
+        
+        # Build structured prompt for scene generation
+        system_prompt = self._get_system_prompt()
+        user_message = self._build_user_message(prompt)
+        full_prompt = f"{system_prompt}\n\n{user_message}"
+        
+        try:
+            logger.info(f"Calling Gemini API ({self.model}) for scene generation: {prompt[:50]}...")
+            
+            # Configure generation parameters
+            generation_config = genai.types.GenerationConfig(
+                temperature=self.temperature,
+                max_output_tokens=self.max_tokens,
+            )
+            
+            response = model.generate_content(
+                full_prompt,
+                generation_config=generation_config
+            )
+            
+            # Extract and parse JSON response
+            llm_response = response.text.strip()
+            logger.info(f"Received Gemini response ({len(llm_response)} chars)")
+            
+            return self._parse_llm_response(llm_response, prompt)
+                
+        except Exception as e:
+            logger.error(f"Gemini API call failed: {e}")
+            logger.info("Falling back to symbolic plan generation")
+            return self._generate_with_symbolic_plan(prompt)
+    
+    def _build_user_message(self, prompt: str) -> str:
+        """Build user message for LLM API call."""
+        return f"""Natural Language Request: "{prompt}"
+
+Please generate a complete scene description that fulfills this request. Consider:
+- What objects are needed for the described scenario
+- How objects should be spatially related 
+- Whether robots are needed and how they should be positioned
+- What constraints ensure a realistic, functional layout
+
+Return only the JSON scene description without any additional text or formatting."""
+    
+    def _parse_llm_response(self, llm_response: str, original_prompt: str) -> SceneDescription:
+        """Parse LLM response and return SceneDescription."""
+        # Clean up response (remove markdown code blocks if present)
+        if llm_response.startswith("```json"):
+            llm_response = llm_response[7:-3].strip()
+        elif llm_response.startswith("```"):
+            llm_response = llm_response[3:-3].strip()
+        
+        # Parse JSON response
+        try:
+            scene_dict = json.loads(llm_response)
+            scene = SceneDescription(**scene_dict)
+            logger.info(f"Successfully generated scene with {len(scene.objects)} objects and {len(scene.robots)} robots")
+            return scene
+            
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Failed to parse LLM response as valid scene: {e}")
+            logger.debug(f"Raw LLM response: {llm_response}")
             
             # Fallback to symbolic plan generation
             logger.info("Falling back to symbolic plan generation")
-            return self._generate_with_symbolic_plan(prompt)
+            return self._generate_with_symbolic_plan(original_prompt)
     
     def _generate_canned_example(self, prompt: str) -> SceneDescription:
         """Generate a canned example scene based on prompt keywords."""
