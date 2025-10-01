@@ -105,8 +105,6 @@ class RemoteViewer {
             generateSceneBtn: document.getElementById('generate-scene-btn'),
             loadSceneBtn: document.getElementById('load-scene-btn'),
             
-            // Camera presets
-            presetBtns: document.querySelectorAll('.preset-btn'),
             
             // Event log and stats
             eventLog: document.getElementById('event-log'),
@@ -162,17 +160,6 @@ class RemoteViewer {
         safeOn(this.elements.loadSceneBtn, 'click', () => this.loadScene());
         safeOn(this.elements.toggleSceneXmlBtn, 'click', () => this.toggleSceneXmlEditor());
         
-        // Camera presets
-        this.elements.presetBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const preset = e.target.dataset.preset;
-                if (preset === 'reset') {
-                    this.sendCommand('reset_camera');
-                } else {
-                    this.sendCommand('set_camera_preset', { preset });
-                }
-            });
-        });
         
         // Free-style command interface
         this.elements.executeCommandBtn.addEventListener('click', () => this.executeFreestyleCommand());
@@ -750,11 +737,6 @@ class RemoteViewer {
         this.elements.startSimBtn.disabled = simControlsDisabled;
         this.elements.pauseSimBtn.disabled = simControlsDisabled;
         this.elements.resetSimBtn.disabled = simControlsDisabled;
-        
-        // Camera presets
-        this.elements.presetBtns.forEach(btn => {
-            btn.disabled = simControlsDisabled;
-        });
         
         // Video overlay
         this.elements.videoOverlay.classList.toggle('hidden', this.isConnected);

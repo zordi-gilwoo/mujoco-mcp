@@ -200,19 +200,6 @@ class BrowserTestSuite:
             result_text = await result_area.text_content()
             assert result_text.strip(), f"No result for command: {cmd}"
     
-    async def test_camera_controls(self):
-        """Test camera control preset buttons"""
-        await self.page.goto(self.server.base_url)
-        await self.page.wait_for_selector(".preset-btn")
-        
-        # Test each camera preset
-        presets = ["front", "side", "top", "reset"]
-        
-        for preset in presets:
-            preset_btn = self.page.locator(f".preset-btn[data-preset='{preset}']")
-            await preset_btn.click()
-            await self.page.wait_for_timeout(500)  # Brief wait between clicks
-    
     async def test_xml_editor_interaction(self):
         """Test XML editor show/hide functionality"""
         await self.page.goto(self.server.base_url)
@@ -291,7 +278,6 @@ class BrowserTestSuite:
             ("Basic Command Execution", self.test_basic_command_execution),
             ("Suggestion Buttons", self.test_suggestion_buttons),
             ("Multiple Commands", self.test_multiple_commands),
-            ("Camera Controls", self.test_camera_controls),
             ("XML Editor Interaction", self.test_xml_editor_interaction),
             ("Simulation Controls", self.test_simulation_controls),
             ("Keyboard Interactions", self.test_keyboard_interactions),

@@ -168,8 +168,7 @@ async def test_web_interface_components():
             ("freestyle-command-input", "Command input textarea"),
             ("execute-command-btn", "Execute command button"),
             ("command-result", "Result display area"),
-            ("suggestion-btn", "Suggestion buttons"),
-            ("preset-btn", "Camera preset buttons")
+            ("suggestion-btn", "Suggestion buttons")
         ]
         
         elements_found = 0

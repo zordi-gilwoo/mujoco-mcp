@@ -210,15 +210,6 @@ button:active {
     transform: translateY(1px);
 }
 
-.preset-btn {
-    background-color: #2196F3;
-    min-width: 60px;
-}
-
-.preset-btn:hover:not(:disabled) {
-    background-color: #1976D2;
-}
-
 /* Event Log */
 .event-log {
     background-color: #1a1a1a;
