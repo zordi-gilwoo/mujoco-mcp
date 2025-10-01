@@ -7,8 +7,14 @@ Production-ready MCP server with MuJoCo Menagerie model integration
 import asyncio
 import sys
 import json
+import os
+import tempfile
+import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional
 import logging
+import base64
+import uuid
+from datetime import datetime
 
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
@@ -20,6 +26,7 @@ from .viewer_client import MuJoCoViewerClient as ViewerClient
 from .menagerie_loader import MenagerieLoader
 from .session_manager import session_manager
 from .process_manager import process_manager
+from .file_handler import FileHandler
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +37,7 @@ server = Server("mujoco-mcp-menagerie")
 
 # Global instances
 menagerie_loader = MenagerieLoader()
+file_handler = FileHandler()
 
 @server.list_tools()
 async def handle_list_tools() -> List[types.Tool]:
@@ -227,6 +235,105 @@ async def handle_list_tools() -> List[types.Tool]:
                     }
                 },
                 "required": ["command"]
+            }
+        ),
+        types.Tool(
+            name="download_xml",
+            description="Download XML content generated from prompts or models",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "ID of the model to download XML from"
+                    },
+                    "include_resolved": {
+                        "type": "boolean",
+                        "description": "Include resolved includes in the XML",
+                        "default": True
+                    }
+                },
+                "required": ["model_id"]
+            }
+        ),
+        types.Tool(
+            name="download_python_script",
+            description="Download Python script that recreates the current simulation",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "model_id": {
+                        "type": "string",
+                        "description": "ID of the model to generate Python script for"
+                    },
+                    "include_viewer_setup": {
+                        "type": "boolean",
+                        "description": "Include viewer setup code in the script",
+                        "default": True
+                    }
+                },
+                "required": ["model_id"]
+            }
+        ),
+        types.Tool(
+            name="upload_xml",
+            description="Upload and validate XML file, then automatically render the scene",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "xml_content": {
+                        "type": "string",
+                        "description": "XML content to upload and validate"
+                    },
+                    "scene_name": {
+                        "type": "string",
+                        "description": "Optional name for the scene (auto-generated if not provided)"
+                    },
+                    "auto_render": {
+                        "type": "boolean",
+                        "description": "Automatically render the scene after validation",
+                        "default": True
+                    }
+                },
+                "required": ["xml_content"]
+            }
+        ),
+        types.Tool(
+            name="upload_python_script",
+            description="Upload and execute Python script to create/modify simulations",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "script_content": {
+                        "type": "string",
+                        "description": "Python script content to upload and execute"
+                    },
+                    "script_name": {
+                        "type": "string",
+                        "description": "Optional name for the script (auto-generated if not provided)"
+                    },
+                    "safe_mode": {
+                        "type": "boolean",
+                        "description": "Run script in safe mode with restricted imports",
+                        "default": True
+                    }
+                },
+                "required": ["script_content"]
+            }
+        ),
+        types.Tool(
+            name="list_uploaded_files",
+            description="List all uploaded files with metadata",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "file_type": {
+                        "type": "string",
+                        "description": "Filter by file type (xml, python)",
+                        "enum": ["xml", "python"]
+                    }
+                },
+                "required": []
             }
         )
     ]
@@ -433,7 +540,8 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                     "capabilities": [
                         "create_scene", "create_menagerie_scene", "list_menagerie_models",
                         "validate_menagerie_model", "step_simulation", "get_state", 
-                        "reset", "close_viewer"
+                        "reset", "close_viewer", "download_xml", "download_python_script",
+                        "upload_xml", "upload_python_script", "list_uploaded_files"
                     ],
                     "menagerie_support": True
                 }, indent=2)
@@ -891,6 +999,441 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                 return [types.TextContent(
                     type="text",
                     text=f"❌ Failed to terminate process for session {session_id}"
+                )]
+        
+        elif name == "download_xml":
+            model_id = arguments.get("model_id")
+            include_resolved = arguments.get("include_resolved", True)
+            
+            if not model_id:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ model_id is required"
+                )]
+            
+            try:
+                xml_content = None
+                model_type = "unknown"
+                
+                # Try built-in scenes first (they don't require sessions)
+                scene_models = {
+                    "pendulum": """<mujoco>
+                        <worldbody>
+                            <body name="pole" pos="0 0 1">
+                                <joint name="hinge" type="hinge" axis="1 0 0"/>
+                                <geom name="pole" type="capsule" size="0.02 0.6" rgba="0.8 0.2 0.2 1"/>
+                                <body name="mass" pos="0 0 -0.6">
+                                    <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.8 0.2 1"/>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "double_pendulum": """<mujoco>
+                        <worldbody>
+                            <body name="pole1" pos="0 0 1">
+                                <joint name="hinge1" type="hinge" axis="1 0 0"/>
+                                <geom name="pole1" type="capsule" size="0.02 0.4" rgba="0.8 0.2 0.2 1"/>
+                                <body name="pole2" pos="0 0 -0.4">
+                                    <joint name="hinge2" type="hinge" axis="1 0 0"/>
+                                    <geom name="pole2" type="capsule" size="0.02 0.4" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="mass" pos="0 0 -0.4">
+                                        <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "cart_pole": """<mujoco>
+                        <worldbody>
+                            <body name="cart" pos="0 0 0.1">
+                                <joint name="slider" type="slide" axis="1 0 0"/>
+                                <geom name="cart" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+                                <body name="pole" pos="0 0 0.1">
+                                    <joint name="hinge" type="hinge" axis="0 1 0"/>
+                                    <geom name="pole" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="mass" pos="0 0 0.5">
+                                        <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "arm": """<mujoco>
+                        <worldbody>
+                            <body name="base" pos="0 0 0.5">
+                                <geom name="base" type="cylinder" size="0.1 0.05" rgba="0.8 0.2 0.2 1"/>
+                                <body name="link1" pos="0 0 0.05">
+                                    <joint name="joint1" type="hinge" axis="0 0 1"/>
+                                    <geom name="link1" type="capsule" size="0.03 0.2" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="link2" pos="0 0 0.2">
+                                        <joint name="joint2" type="hinge" axis="0 1 0"/>
+                                        <geom name="link2" type="capsule" size="0.03 0.15" rgba="0.2 0.2 0.8 1"/>
+                                        <body name="end_effector" pos="0 0 0.15">
+                                            <geom name="ee" type="sphere" size="0.03" rgba="0.8 0.8 0.2 1"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>"""
+                }
+                
+                if model_id in scene_models:
+                    xml_content = scene_models[model_id].strip()
+                    model_type = "built-in"
+                else:
+                    # Try menagerie models
+                    try:
+                        if include_resolved:
+                            xml_content = menagerie_loader.get_model_xml(model_id)
+                        else:
+                            # Get raw XML without resolution
+                            xml_content = menagerie_loader.download_file(model_id, f"{model_id}.xml")
+                        model_type = "menagerie"
+                    except Exception as e:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"❌ Could not find model '{model_id}' in built-in scenes or menagerie: {str(e)}"
+                        )]
+                
+                if not xml_content:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Could not find XML content for model: {model_id}"
+                    )]
+                
+                # Encode as base64 for safe transport
+                xml_b64 = base64.b64encode(xml_content.encode('utf-8')).decode('ascii')
+                
+                result = {
+                    "model_id": model_id,
+                    "model_type": model_type,
+                    "include_resolved": include_resolved,
+                    "xml_size": len(xml_content),
+                    "download_info": {
+                        "filename": f"{model_id}.xml",
+                        "content_type": "application/xml",
+                        "encoding": "base64"
+                    },
+                    "xml_content_base64": xml_b64
+                }
+                
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ XML downloaded for {model_id}\n📄 {json.dumps(result, indent=2)}"
+                )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to download XML: {str(e)}"
+                )]
+        
+        elif name == "download_python_script":
+            model_id = arguments.get("model_id")
+            include_viewer_setup = arguments.get("include_viewer_setup", True)
+            
+            if not model_id:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ model_id is required"
+                )]
+            
+            try:
+                # Get XML content directly (reuse logic from download_xml)
+                xml_content = None
+                model_type = "unknown"
+                
+                # Try built-in scenes first
+                scene_models = {
+                    "pendulum": """<mujoco>
+                        <worldbody>
+                            <body name="pole" pos="0 0 1">
+                                <joint name="hinge" type="hinge" axis="1 0 0"/>
+                                <geom name="pole" type="capsule" size="0.02 0.6" rgba="0.8 0.2 0.2 1"/>
+                                <body name="mass" pos="0 0 -0.6">
+                                    <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.8 0.2 1"/>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "double_pendulum": """<mujoco>
+                        <worldbody>
+                            <body name="pole1" pos="0 0 1">
+                                <joint name="hinge1" type="hinge" axis="1 0 0"/>
+                                <geom name="pole1" type="capsule" size="0.02 0.4" rgba="0.8 0.2 0.2 1"/>
+                                <body name="pole2" pos="0 0 -0.4">
+                                    <joint name="hinge2" type="hinge" axis="1 0 0"/>
+                                    <geom name="pole2" type="capsule" size="0.02 0.4" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="mass" pos="0 0 -0.4">
+                                        <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "cart_pole": """<mujoco>
+                        <worldbody>
+                            <body name="cart" pos="0 0 0.1">
+                                <joint name="slider" type="slide" axis="1 0 0"/>
+                                <geom name="cart" type="box" size="0.1 0.1 0.1" rgba="0.8 0.2 0.2 1"/>
+                                <body name="pole" pos="0 0 0.1">
+                                    <joint name="hinge" type="hinge" axis="0 1 0"/>
+                                    <geom name="pole" type="capsule" size="0.02 0.5" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="mass" pos="0 0 0.5">
+                                        <geom name="mass" type="sphere" size="0.05" rgba="0.2 0.2 0.8 1"/>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>""",
+                    "arm": """<mujoco>
+                        <worldbody>
+                            <body name="base" pos="0 0 0.5">
+                                <geom name="base" type="cylinder" size="0.1 0.05" rgba="0.8 0.2 0.2 1"/>
+                                <body name="link1" pos="0 0 0.05">
+                                    <joint name="joint1" type="hinge" axis="0 0 1"/>
+                                    <geom name="link1" type="capsule" size="0.03 0.2" rgba="0.2 0.8 0.2 1"/>
+                                    <body name="link2" pos="0 0 0.2">
+                                        <joint name="joint2" type="hinge" axis="0 1 0"/>
+                                        <geom name="link2" type="capsule" size="0.03 0.15" rgba="0.2 0.2 0.8 1"/>
+                                        <body name="end_effector" pos="0 0 0.15">
+                                            <geom name="ee" type="sphere" size="0.03" rgba="0.8 0.8 0.2 1"/>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </worldbody>
+                    </mujoco>"""
+                }
+                
+                if model_id in scene_models:
+                    xml_content = scene_models[model_id].strip()
+                    model_type = "built-in"
+                else:
+                    # Try menagerie models
+                    try:
+                        xml_content = menagerie_loader.get_model_xml(model_id)
+                        model_type = "menagerie"
+                    except Exception as e:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"❌ Could not find model '{model_id}' in built-in scenes or menagerie: {str(e)}"
+                        )]
+                
+                if not xml_content:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Could not find XML content for model: {model_id}"
+                    )]
+                
+                # Generate Python script
+                script_content = file_handler.generate_python_script(
+                    xml_content, model_id, include_viewer_setup
+                )
+                
+                # Encode script as base64
+                script_b64 = base64.b64encode(script_content.encode('utf-8')).decode('ascii')
+                
+                result = {
+                    "model_id": model_id,
+                    "model_type": model_type,
+                    "include_viewer": include_viewer_setup,
+                    "script_size": len(script_content),
+                    "download_info": {
+                        "filename": f"{model_id}_simulation.py",
+                        "content_type": "text/x-python",
+                        "encoding": "base64"
+                    },
+                    "script_content_base64": script_b64
+                }
+                
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ Python script generated for {model_id}\n🐍 {json.dumps(result, indent=2)}"
+                )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to generate Python script: {str(e)}"
+                )]
+        
+        elif name == "upload_xml":
+            xml_content = arguments.get("xml_content", "").strip()
+            scene_name = arguments.get("scene_name")
+            auto_render = arguments.get("auto_render", True)
+            
+            if not xml_content:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ xml_content is required"
+                )]
+            
+            try:
+                # Validate the XML
+                validation_result = file_handler.validate_xml(xml_content)
+                
+                if not validation_result["valid"]:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ XML validation failed: {validation_result['error']}"
+                    )]
+                
+                # Generate scene name if not provided
+                if not scene_name:
+                    scene_name = f"uploaded_scene_{uuid.uuid4().hex[:8]}"
+                
+                # Save the uploaded file
+                file_id = file_handler.save_upload_file(xml_content, "xml", f"{scene_name}.xml")
+                
+                if auto_render:
+                    # Create the scene in the viewer
+                    session = session_manager.get_or_create_session()
+                    viewer_client = session_manager.get_viewer_client()
+                    
+                    if not viewer_client:
+                        return [types.TextContent(
+                            type="text",
+                            text=f"✅ XML validated and uploaded (File ID: {file_id})\n❌ Auto-render failed: No viewer connection"
+                        )]
+                    
+                    # Load the model in viewer
+                    session_model_id = f"{session.session_id}_{scene_name}"
+                    response = viewer_client.send_command({
+                        "type": "load_model",
+                        "model_id": session_model_id,
+                        "model_xml": xml_content
+                    })
+                    
+                    if response.get("success"):
+                        # Track the model in session
+                        session.active_models[scene_name] = scene_name
+                        
+                        result = {
+                            "file_id": file_id,
+                            "scene_name": scene_name,
+                            "validation": validation_result,
+                            "rendering": {
+                                "success": True,
+                                "session_id": session.session_id,
+                                "model_id": session_model_id
+                            }
+                        }
+                        
+                        return [types.TextContent(
+                            type="text",
+                            text=f"✅ XML uploaded, validated, and rendered successfully!\n📄 {json.dumps(result, indent=2)}"
+                        )]
+                    else:
+                        result = {
+                            "file_id": file_id,
+                            "scene_name": scene_name,
+                            "validation": validation_result,
+                            "rendering": {
+                                "success": False,
+                                "error": response.get("error", "Unknown error")
+                            }
+                        }
+                        
+                        return [types.TextContent(
+                            type="text",
+                            text=f"✅ XML uploaded and validated, but rendering failed\n📄 {json.dumps(result, indent=2)}"
+                        )]
+                else:
+                    result = {
+                        "file_id": file_id,
+                        "scene_name": scene_name,
+                        "validation": validation_result,
+                        "rendering": {"skipped": True}
+                    }
+                    
+                    return [types.TextContent(
+                        type="text",
+                        text=f"✅ XML uploaded and validated (auto-render disabled)\n📄 {json.dumps(result, indent=2)}"
+                    )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to upload XML: {str(e)}"
+                )]
+        
+        elif name == "upload_python_script":
+            script_content = arguments.get("script_content", "").strip()
+            script_name = arguments.get("script_name")
+            safe_mode = arguments.get("safe_mode", True)
+            
+            if not script_content:
+                return [types.TextContent(
+                    type="text",
+                    text="❌ script_content is required"
+                )]
+            
+            try:
+                # Validate the Python script
+                validation_result = file_handler.validate_python_script(script_content, safe_mode)
+                
+                if not validation_result["valid"]:
+                    return [types.TextContent(
+                        type="text",
+                        text=f"❌ Python script validation failed: {validation_result['error']}\n💡 {validation_result.get('suggestion', '')}"
+                    )]
+                
+                # Generate script name if not provided
+                if not script_name:
+                    script_name = f"uploaded_script_{uuid.uuid4().hex[:8]}.py"
+                
+                # Save the uploaded file
+                file_id = file_handler.save_upload_file(script_content, "python", script_name)
+                
+                result = {
+                    "file_id": file_id,
+                    "script_name": script_name,
+                    "validation": validation_result,
+                    "execution": {
+                        "note": "Script uploaded but not executed. Manual execution required for safety."
+                    }
+                }
+                
+                return [types.TextContent(
+                    type="text",
+                    text=f"✅ Python script uploaded and validated!\n🐍 {json.dumps(result, indent=2)}\n\n⚠️ Note: For safety reasons, uploaded scripts are not automatically executed. You can download and run them manually."
+                )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to upload Python script: {str(e)}"
+                )]
+        
+        elif name == "list_uploaded_files":
+            file_type = arguments.get("file_type")
+            
+            try:
+                files_info = file_handler.list_uploaded_files()
+                
+                # Filter by file type if specified
+                if file_type:
+                    filtered_files = [
+                        f for f in files_info["files"] 
+                        if f["type"] == file_type
+                    ]
+                    files_info = {
+                        "total_files": len(filtered_files),
+                        "files": filtered_files,
+                        "filter": f"type={file_type}"
+                    }
+                
+                return [types.TextContent(
+                    type="text",
+                    text=f"📁 Uploaded Files\n{json.dumps(files_info, indent=2)}"
+                )]
+                
+            except Exception as e:
+                return [types.TextContent(
+                    type="text",
+                    text=f"❌ Failed to list uploaded files: {str(e)}"
                 )]
         
         elif name == "execute_command":
