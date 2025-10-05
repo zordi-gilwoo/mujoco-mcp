@@ -360,21 +360,41 @@ class ConstraintSolver:
 
             xy_position = current_xy
 
-        # Apply vertical constraints (update Z only, preserve XY)
+        # Apply vertical constraints
         if vertical_constraints:
-            # Pass the current XY position so it's preserved
-            temp_pos = np.array([xy_position[0], xy_position[1], z_position])
-
-            for constraint in vertical_constraints:
-                result_pos = self._apply_constraint(
-                    constraint, temp_pos, entity_metadata, poses, scene, orientation
-                )
-                z_position = result_pos[2]
-                # ✅ XY from horizontal constraints is preserved
-
-                logger.debug(
-                    f"Applied vertical constraint {constraint.type} to {entity_id}: Z={z_position} (preserved XY={xy_position})"
-                )
+            # If no horizontal constraints were applied, inherit XY from reference
+            # Otherwise preserve XY from horizontal constraints
+            if not horizontal_constraints and not full_constraints:
+                # No horizontal positioning - use reference's XY for vertical constraints
+                temp_pos = np.array([0.0, 0.0, z_position])
+                
+                for constraint in vertical_constraints:
+                    result_pos = self._apply_constraint(
+                        constraint, temp_pos, entity_metadata, poses, scene, orientation
+                    )
+                    z_position = result_pos[2]
+                    # ✅ Inherit XY from reference (result_pos includes reference's XY)
+                    xy_position = result_pos[:2]
+                    
+                    logger.debug(
+                        f"Applied vertical constraint {constraint.type} to {entity_id}: "
+                        f"inherited XY={xy_position} from reference, Z={z_position}"
+                    )
+            else:
+                # Horizontal constraints already set XY - preserve it
+                temp_pos = np.array([xy_position[0], xy_position[1], z_position])
+                
+                for constraint in vertical_constraints:
+                    result_pos = self._apply_constraint(
+                        constraint, temp_pos, entity_metadata, poses, scene, orientation
+                    )
+                    z_position = result_pos[2]
+                    # ✅ XY from horizontal constraints is preserved
+                    
+                    logger.debug(
+                        f"Applied vertical constraint {constraint.type} to {entity_id}: "
+                        f"Z={z_position} (preserved XY={xy_position})"
+                    )
 
         position = np.array([xy_position[0], xy_position[1], z_position])
         logger.debug(f"Final position for {entity_id}: {position}")
@@ -435,6 +455,12 @@ class ConstraintSolver:
         """Apply a single constraint to determine new position."""
         reference_pose = poses[constraint.reference]
         reference_metadata = self._get_entity_metadata(constraint.reference, scene)
+        
+        # DEBUG logging to trace reference pose
+        logger.debug(
+            f"Applying {constraint.type} constraint: subject={constraint.subject}, "
+            f"reference={constraint.reference}, reference_pose={reference_pose.position}"
+        )
 
         if constraint.type == "on_top_of":
             return self._apply_on_top_of(
