@@ -660,6 +660,12 @@ export STRUCTURED_SCENE_LLM="enabled"
 
 ## 📚 Additional Resources
 
+### Project Documentation
+- [API Reference](API_REFERENCE.md) - Complete API documentation
+- [Architecture](ARCHITECTURE.md) - System architecture details
+- [Scene Generation Status](AGENTS.md) - Implementation status
+- [Code Quality Guide](CODE_QUALITY.md) - Development standards
+
 ### External Documentation
 - [MCP Specification](https://modelcontextprotocol.io/specification/2024-11-05)
 - [MuJoCo Documentation](https://mujoco.readthedocs.io/)

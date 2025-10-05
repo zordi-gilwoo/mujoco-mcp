@@ -9,14 +9,15 @@ This document provides comprehensive API documentation for all MCP tools, Python
 ## 📋 Table of Contents
 
 1. [MCP Tools API](#mcp-tools-api)
-2. [Python Modules API](#python-modules-api)
-3. [Viewer Server API](#viewer-server-api)
-4. [Advanced Controllers API](#advanced-controllers-api)
-5. [Multi-Robot Coordination API](#multi-robot-coordination-api)
-6. [Sensor Feedback API](#sensor-feedback-api)
-7. [RL Integration API](#rl-integration-api)
-8. [Visualization Tools API](#visualization-tools-api)
-9. [WebRTC Viewer API](#webrtc-viewer-api)
+2. [WebRTC Viewer API](#webrtc-viewer-api)
+3. [Scene Generation API](#scene-generation-api)
+4. [Python Modules API](#python-modules-api)
+5. [Viewer Server API](#viewer-server-api)
+6. [Advanced Controllers API](#advanced-controllers-api)
+7. [Multi-Robot Coordination API](#multi-robot-coordination-api)
+8. [Sensor Feedback API](#sensor-feedback-api)
+9. [RL Integration API](#rl-integration-api)
+10. [Visualization Tools API](#visualization-tools-api)
 
 ---
 
@@ -224,6 +225,160 @@ Close the MuJoCo GUI window.
   "success": true,
   "message": "Viewer closed"
 }
+```
+
+---
+
+## 🌐 WebRTC Viewer API
+
+### REST Endpoints
+
+**Base URL**: `http://localhost:8000`
+
+#### `GET /api/health`
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "clients_connected": 3
+}
+```
+
+#### `GET /api/stats`
+Server statistics.
+
+**Response:**
+```json
+{
+  "clients_connected": 3,
+  "total_connections": 15,
+  "events_received": 1250,
+  "frames_sent": 45000,
+  "simulation_state": {
+    "time": 125.6,
+    "is_running": true
+  }
+}
+```
+
+#### `POST /api/scene/load`
+Load scene from XML.
+
+**Request:**
+```json
+{
+  "xml": "<mujoco>...</mujoco>"
+}
+```
+
+#### `POST /api/scene/generate`
+Generate scene using LLM.
+
+**Request:**
+```json
+{
+  "prompt": "Create a cart pole with a 2m long pole"
+}
+```
+
+####POST /api/config/api-key`
+Configure LLM provider.
+
+**Request:**
+```json
+{
+  "provider": "openai",
+  "api_key": "sk-..."
+}
+```
+
+### WebSocket Endpoint
+
+#### `WS /ws/signaling`
+WebRTC signaling and event handling.
+
+---
+
+## 🎨 Scene Generation API
+
+### Python API
+
+```python
+from mujoco_mcp.scene_gen import (
+    LLMSceneGenerator,
+    MetadataExtractor,
+    SceneDescription,
+    ObjectPlacement,
+    SpatialConstraint
+)
+
+# Initialize generator
+metadata_extractor = MetadataExtractor()
+generator = LLMSceneGenerator(metadata_extractor)
+
+# Generate from natural language
+scene = generator.generate_scene_description(
+    "Create a cart pole with a 2m long pole"
+)
+
+# Convert to XML
+xml = scene.to_xml()
+```
+
+### Parametric Primitives
+
+| Primitive | Required Dimensions |
+|-----------|-------------------|
+| `primitive:box` | width, depth, height |
+| `primitive:sphere` | radius |
+| `primitive:cylinder` | radius, height |
+| `primitive:capsule` | radius, length |
+| `primitive:ellipsoid` | radius_x, radius_y, radius_z |
+
+### Spatial Constraints
+
+| Constraint | Description |
+|-----------|-------------|
+| `on_top_of` | Place subject on top of reference |
+| `beside` | Place subject beside reference (Y direction) |
+| `in_front_of` | Place subject in front (X direction) |
+| `inside` | Place subject inside container |
+| `no_collision` | Ensure minimum clearance |
+| `within_reach` | Position within robot workspace |
+| `aligned_with_axis` | Align along reference axis |
+| `oriented_towards` | Orient towards reference |
+
+### Example: Programmatic Scene Creation
+
+```python
+scene = SceneDescription(
+    objects=[
+        ObjectPlacement(
+            object_id="table",
+            object_type="table_standard",
+            constraints=[]
+        ),
+        ObjectPlacement(
+            object_id="ball",
+            object_type="primitive:sphere",
+            dimensions={"radius": 0.1},
+            color=(1.0, 0.0, 0.0, 1.0),
+            constraints=[
+                SpatialConstraint(
+                    type="on_top_of",
+                    subject="ball",
+                    reference="table",
+                    clearance=0.001
+                )
+            ]
+        )
+    ]
+)
+
+xml = scene.to_xml()
 ```
 
 ---

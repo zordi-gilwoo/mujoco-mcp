@@ -17,11 +17,11 @@ This document provides a comprehensive overview of the MuJoCo MCP system archite
 ┌────────────────────────────────▼───────────────────────────────────────┐
 │                           MCP Server Layer                              │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌───────────────────┐    │
-│  │   mcp_server.py │  │ Protocol Handler │  │  Tool Registry    │    │
+│  │   mcp_server.py │  │ Scene Generator  │  │  Tool Registry    │    │
 │  │                 │  │                  │  │                   │    │
-│  │  - List Tools   │  │  - JSON-RPC 2.0  │  │ - 9 MCP Tools     │    │
-│  │  - Call Tools   │  │  - Error Handling │  │ - Natural Lang    │    │
-│  │  - Capabilities │  │  - Request Router │  │ - Validation      │    │
+│  │  - List Tools   │  │  - LLM Provider  │  │ - 9 MCP Tools     │    │
+│  │  - Call Tools   │  │  - Constraints   │  │ - Natural Lang    │    │
+│  │  - Capabilities │  │  - XML Builder   │  │ - Validation      │    │
 │  └─────────────────┘  └──────────────────┘  └───────────────────┘    │
 └────────────────────────────────┬───────────────────────────────────────┘
                                  │ Socket IPC (localhost:8888)
@@ -46,6 +46,16 @@ This document provides a comprehensive overview of the MuJoCo MCP system archite
 │  │ - Visualization     │  │ - Integration   │  │ - Debug Info     │   │
 │  └─────────────────────┘  └─────────────────┘  └─────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
+
+Alternative: WebRTC Viewer (Browser-based)
+
+┌─────────────────┐    WebRTC     ┌──────────────────────────────────┐
+│   Web Browser   │◄─────────────►│   WebRTC Viewer Server           │
+│   (Multiple)    │   Streaming   │   - FastAPI + aiortc             │
+└─────────────────┘               │   - MuJoCo Integration           │
+                                  │   - Scene Generation (LLM)       │
+                                  │   - Multi-Client Support         │
+                                  └──────────────────────────────────┘
 ```
 
 ---
@@ -56,12 +66,27 @@ This document provides a comprehensive overview of the MuJoCo MCP system archite
 
 ```
 src/mujoco_mcp/
-├── __init__.py              # Package initialization
-├── __main__.py              # Entry point: python -m mujoco_mcp
-├── server.py                # Main server coordination
-├── mcp_server.py            # MCP protocol implementation
-├── viewer_client.py         # Socket client for viewer server
-└── version.py               # Version management
+├── __init__.py                    # Package initialization
+├── __main__.py                    # Entry point
+├── server.py                      # Main server coordination
+├── mcp_server.py                  # MCP protocol implementation
+├── viewer_client.py               # Socket client for viewer server
+├── session_manager.py             # Multi-client session management
+├── process_manager.py             # Process pool for isolation
+├── version.py                     # Version management
+├── egl_renderer.py                # EGL headless rendering
+├── h264_encoder.py                # H.264 video encoding
+└── scene_gen/                     # Scene generation system
+    ├── scene_schema.py            # Pydantic models
+    ├── llm_scene_generator.py     # LLM integration
+    ├── constraint_solver.py       # Spatial constraint solving
+    ├── scene_xml_builder.py       # MuJoCo XML generation
+    ├── metadata_extractor.py      # Asset metadata
+    ├── enhanced_collision.py      # Collision detection
+    ├── spatial_reasoning.py       # Spatial reasoning
+    ├── symbolic_plan.py           # Symbolic plans
+    ├── enhanced_semantics.py      # Asset semantics
+    └── robust_solver.py           # Robust constraint solver
 ```
 
 #### Key Classes and Responsibilities
@@ -81,7 +106,29 @@ src/mujoco_mcp/
 - Connection management and retry logic
 - Command serialization/deserialization
 
-### 2. Advanced Feature Modules
+### 2. WebRTC Viewer Components
+
+```
+py_remote_viewer/
+├── __init__.py                # Package initialization
+├── __main__.py                # CLI entry point
+├── server.py                  # FastAPI server
+├── signaling.py               # WebRTC signaling
+├── webrtc_track.py            # Video track implementation
+├── mujoco_simulation.py       # MuJoCo physics integration
+├── builtin_scenes.py          # Built-in scene definitions
+├── camera_state.py            # Camera control logic
+├── events.py                  # Event protocol
+├── config.py                  # Configuration
+└── logging_utils.py           # Logging utilities
+
+client/
+├── index.html                 # Web interface
+├── app.js                     # WebRTC client logic
+└── styles.css                 # Styling
+```
+
+### 3. Advanced Feature Modules
 
 ```
 src/mujoco_mcp/
@@ -426,25 +473,6 @@ class CustomController(RobotController):
 - Tool usage frequency
 - Feature adoption
 - User patterns
-
----
-
-## 🔮 Future Architecture Considerations
-
-### 1. Distributed Simulation
-- Multi-machine coordination
-- Cloud deployment support
-- Load balancing strategies
-
-### 2. GPU Acceleration
-- CUDA integration for physics
-- Parallel simulation support
-- ML model inference
-
-### 3. Real Robot Integration
-- Hardware abstraction layer
-- Sensor data ingestion
-- Control output mapping
 
 ---
 
