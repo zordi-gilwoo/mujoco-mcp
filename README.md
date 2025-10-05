@@ -185,22 +185,6 @@ Each client gets an isolated viewer process with automatic port allocation and c
 - **[Testing](docs/testing/TESTING.md)** - How to run tests
 - **[Changelog](CHANGELOG.md)** - Version history
 
----
-
-## Troubleshooting
-
-**"Failed to connect to viewer server"**
-- Start server: `python mujoco_viewer_server.py`
-- Check port 8888 is available
-- On macOS: use `/opt/miniconda3/bin/mjpython`
-
-**"Model not found"**
-- Install MuJoCo Menagerie
-- Set `MUJOCO_MENAGERIE_PATH` environment variable
-
-**Performance issues**
-- Use enhanced server: `python mujoco_viewer_server_enhanced.py`
-- Enable GPU acceleration (see EGL_H264_FEATURES.md)
 
 ---
 
