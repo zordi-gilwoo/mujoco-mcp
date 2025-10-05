@@ -72,6 +72,7 @@ class RemoteViewer {
             videoContainer: document.querySelector('.video-container'),
             
             // Control buttons
+            resetCameraBtn: document.getElementById('reset-camera-btn'),
             fullscreenBtn: document.getElementById('fullscreen-btn'),
             
             // Simulation controls
@@ -137,6 +138,7 @@ class RemoteViewer {
         };
 
         // Connection controls
+        safeOn(this.elements.resetCameraBtn, 'click', () => this.resetCamera());
         safeOn(this.elements.fullscreenBtn, 'click', () => this.toggleFullscreen());
         
         // Simulation controls
@@ -748,6 +750,19 @@ class RemoteViewer {
             buttons: 0,
             target: e.target
         });
+    }
+    
+    /**
+     * Reset camera to default position
+     */
+    resetCamera() {
+        if (!this.isConnected) {
+            console.warn('[RemoteViewer] Cannot reset camera - not connected');
+            return;
+        }
+        
+        this.sendCommand('reset_camera');
+        this.logEvent('Camera', 'Camera reset to default position');
     }
     
     /**
