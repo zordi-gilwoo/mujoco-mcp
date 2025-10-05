@@ -47,9 +47,7 @@ async def demo_sequence():
     # Set position
     result = await handle_call_tool(
         "set_joint_positions",
-        {
-            "positions": [1.57]  # 90 degrees
-        },
+        {"positions": [1.57]},  # 90 degrees
     )
     print(f"   {result[0].text}")
     await asyncio.sleep(2)
@@ -72,9 +70,7 @@ async def demo_sequence():
     # Set initial positions
     result = await handle_call_tool(
         "set_joint_positions",
-        {
-            "positions": [0.785, -0.785]  # 45 and -45 degrees
-        },
+        {"positions": [0.785, -0.785]},  # 45 and -45 degrees
     )
     print(f"   {result[0].text}")
     await asyncio.sleep(1)

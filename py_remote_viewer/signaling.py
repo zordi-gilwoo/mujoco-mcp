@@ -108,55 +108,73 @@ class SignalingServer:
         if not self.llm_generator:
             return {
                 "success": False,
-                "error": "LLM integration not available. Using basic scene templates instead.",
-                "scene_xml": self._generate_basic_scene_from_prompt(prompt),
+                "error": "LLM integration not available. Scene generation aborted.",
+                "scene_xml": None,
             }
 
-        try:
-            # Use LLM to generate scene
-            logger.info(f"Calling LLM generator for prompt: '{prompt[:100]}...'")
-            scene_description = await asyncio.get_event_loop().run_in_executor(
-                None, self.llm_generator.generate_scene_description, prompt
-            )
+        base_prompt = prompt
+        current_prompt = base_prompt
+        last_error: Optional[Exception] = None
+        structured_json: Optional[Dict[str, Any]] = None
 
-            logger.info(
-                f"LLM generator returned: {type(scene_description)}, has to_xml: {hasattr(scene_description, 'to_xml') if scene_description else False}"
-            )
+        loop = asyncio.get_event_loop()
 
-            if scene_description and hasattr(scene_description, "to_xml"):
-                scene_xml = scene_description.to_xml()
-                logger.info(f"Successfully generated XML from LLM ({len(scene_xml)} chars)")
+        for attempt in range(1, 4):
+            logger.info("LLM attempt %d for prompt '%s'", attempt, current_prompt[:100])
 
-                # Store and broadcast the generated scene
-                self.current_scene_xml = scene_xml
-                await self.broadcast_scene_update(scene_xml)
-
-                return {
-                    "success": True,
-                    "scene_xml": scene_xml,
-                    "message": "Scene generated successfully using LLM",
-                }
-            else:
-                # Fallback to basic scene generation
-                logger.warning(
-                    f"LLM returned invalid scene_description (type={type(scene_description)}), using fallback"
+            try:
+                trace = await loop.run_in_executor(
+                    None, self.llm_generator.generate_scene_with_trace, current_prompt
                 )
-                scene_xml = self._generate_basic_scene_from_prompt(prompt)
-                return {
-                    "success": True,
-                    "scene_xml": scene_xml,
-                    "message": "Scene generated using fallback method",
-                }
+            except Exception as exc:
+                logger.error("LLM generation attempt %d failed: %s", attempt, exc, exc_info=True)
+                last_error = exc
+                if attempt == 3:
+                    break
+                current_prompt = self._augment_prompt_with_error(base_prompt, exc, structured_json)
+                continue
 
-        except Exception as e:
-            logger.error(f"LLM scene generation failed: {e}", exc_info=True)
-            # Fallback to basic scene generation
-            scene_xml = self._generate_basic_scene_from_prompt(prompt)
+            scene_description = trace.get("scene_description")
+            structured_json = trace.get("structured_scene_json")
+
+            if not scene_description or not hasattr(scene_description, "to_xml"):
+                logger.warning(
+                    "LLM returned invalid scene_description (type=%s) on attempt %d",
+                    type(scene_description),
+                    attempt,
+                )
+                last_error = RuntimeError("Invalid scene description from LLM")
+                if attempt == 3:
+                    break
+                current_prompt = self._augment_prompt_with_error(base_prompt, last_error, structured_json)
+                continue
+
+            try:
+                scene_xml = scene_description.to_xml()
+            except Exception as exc:
+                logger.error("MuJoCo conversion failed on attempt %d: %s", attempt, exc, exc_info=True)
+                last_error = exc
+                if attempt == 3:
+                    break
+                current_prompt = self._augment_prompt_with_error(base_prompt, exc, structured_json)
+                continue
+
+            logger.info("Successfully generated XML from LLM (%d chars)", len(scene_xml))
+            self.current_scene_xml = scene_xml
+            await self.broadcast_scene_update(scene_xml)
+
             return {
                 "success": True,
                 "scene_xml": scene_xml,
-                "message": f"LLM generation failed, using fallback: {str(e)}",
+                "message": "Scene generated successfully using LLM",
             }
+
+        logger.error("LLM generation failed after retries. Last error: %s", last_error)
+        return {
+            "success": False,
+            "scene_xml": None,
+            "error": f"LLM generation failed after retries: {last_error}",
+        }
 
     def _generate_basic_scene_from_prompt(self, prompt: str) -> str:
         """Generate basic scene XML from prompt using simple keyword matching."""
@@ -226,6 +244,33 @@ class SignalingServer:
         </body>
     </worldbody>
 </mujoco>"""
+
+    @staticmethod
+    def _augment_prompt_with_error(
+        base_prompt: str,
+        error: Exception,
+        structured_json: Optional[Dict[str, Any]],
+    ) -> str:
+        """Produce a follow-up prompt that asks the LLM to correct a failure."""
+
+        message_lines = [
+            base_prompt,
+            "",
+            "The previous attempt failed when rendering the scene to MuJoCo XML.",
+            f"Error message: {error}",
+        ]
+
+        if structured_json is not None:
+            message_lines.append(
+                "Here is the JSON that failed. Please respond with a corrected JSON scene description that avoids the issue:"
+            )
+            message_lines.append(json.dumps(structured_json, indent=2))
+
+        message_lines.append(
+            "Return only the corrected JSON scene description without additional commentary."
+        )
+
+        return "\n".join(message_lines)
 
     async def handle_websocket(self, websocket: WebSocket):
         """Handle a new WebSocket connection for signaling.

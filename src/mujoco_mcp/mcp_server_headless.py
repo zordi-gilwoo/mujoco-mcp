@@ -25,6 +25,7 @@ from .h264_encoder import H264Encoder, StreamingEncoder, check_h264_support
 
 try:
     from PIL import Image
+
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
@@ -48,16 +49,16 @@ class HeadlessSimulation:
         self.model = mujoco.MjModel.from_xml_string(xml_string)
         self.data = mujoco.MjData(self.model)
         self.viewer = None  # No viewer in headless mode
-        
+
         # EGL rendering support
         self._egl_renderer = None
         self._software_renderer = None
         self._use_egl = False
-        
+
         # Video encoding support
         self._h264_encoder = None
         self._streaming_encoder = None
-        
+
     def enable_egl_rendering(self, width: int = 640, height: int = 480) -> bool:
         """Enable EGL-based GPU rendering"""
         try:
@@ -68,10 +69,10 @@ class HeadlessSimulation:
                 return True
         except Exception as e:
             logger.warning(f"Failed to enable EGL rendering: {e}")
-            
+
         self._use_egl = False
         return False
-        
+
     def render_frame(self, width: int = 640, height: int = 480, camera_id: int = -1) -> np.ndarray:
         """Render frame using EGL or fallback to software rendering"""
         if self._use_egl and self._egl_renderer:
@@ -81,25 +82,29 @@ class HeadlessSimulation:
             except Exception as e:
                 logger.warning(f"EGL rendering failed, falling back to software: {e}")
                 self._use_egl = False
-                
+
         # Fallback to software rendering
         return self._render_software(width, height, camera_id)
-        
-    def _render_software(self, width: int = 640, height: int = 480, camera_id: int = -1) -> np.ndarray:
+
+    def _render_software(
+        self, width: int = 640, height: int = 480, camera_id: int = -1
+    ) -> np.ndarray:
         """Software rendering fallback"""
         try:
             if not self._software_renderer:
                 self._software_renderer = mujoco.Renderer(self.model, height, width)
-                
+
             self._software_renderer.update_scene(self.data, camera=camera_id)
             return self._software_renderer.render()
-            
+
         except Exception as e:
             logger.warning(f"Software rendering failed: {e}")
             # Create a placeholder image
             return np.ones((height, width, 3), dtype=np.uint8) * 128
-            
-    def setup_h264_encoder(self, width: int = 640, height: int = 480, fps: int = 30, bitrate: str = "2M"):
+
+    def setup_h264_encoder(
+        self, width: int = 640, height: int = 480, fps: int = 30, bitrate: str = "2M"
+    ):
         """Setup H.264 encoder for video recording"""
         try:
             self._h264_encoder = H264Encoder(width, height, fps, bitrate)
@@ -108,8 +113,10 @@ class HeadlessSimulation:
         except Exception as e:
             logger.error(f"Failed to setup H.264 encoder: {e}")
             return False
-            
-    def setup_streaming_encoder(self, width: int = 640, height: int = 480, fps: int = 30, bitrate: str = "1M"):
+
+    def setup_streaming_encoder(
+        self, width: int = 640, height: int = 480, fps: int = 30, bitrate: str = "1M"
+    ):
         """Setup streaming encoder for real-time video"""
         try:
             self._streaming_encoder = StreamingEncoder(width, height, fps, bitrate)
@@ -118,7 +125,7 @@ class HeadlessSimulation:
         except Exception as e:
             logger.error(f"Failed to setup streaming encoder: {e}")
             return False
-            
+
     def add_frame_to_encoder(self, frame: np.ndarray) -> Optional[bytes]:
         """Add frame to H.264 encoder and return chunk if ready (streaming mode)"""
         if self._streaming_encoder:
@@ -126,7 +133,7 @@ class HeadlessSimulation:
         elif self._h264_encoder:
             self._h264_encoder.add_frame(frame)
         return None
-        
+
     def encode_video(self) -> Optional[bytes]:
         """Encode buffered frames to H.264 bytes"""
         if self._h264_encoder:
@@ -144,16 +151,16 @@ class HeadlessSimulation:
             except:
                 pass
             self._egl_renderer = None
-            
+
         if self._software_renderer:
             self._software_renderer = None
-            
+
         if self._h264_encoder:
             self._h264_encoder = None
-            
+
         if self._streaming_encoder:
             self._streaming_encoder = None
-            
+
         logger.info(f"Closed simulation {self.model_id}")
 
     def step(self, steps: int = 1):
@@ -268,7 +275,7 @@ async def handle_list_tools() -> List[types.Tool]:
                 "properties": {
                     "model_id": {"type": "string", "description": "ID of the model"},
                     "width": {"type": "integer", "description": "Render width", "default": 640},
-                    "height": {"type": "integer", "description": "Render height", "default": 480}
+                    "height": {"type": "integer", "description": "Render height", "default": 480},
                 },
                 "required": ["model_id"],
             },
@@ -282,7 +289,7 @@ async def handle_list_tools() -> List[types.Tool]:
                     "model_id": {"type": "string", "description": "ID of the model"},
                     "width": {"type": "integer", "description": "Render width", "default": 640},
                     "height": {"type": "integer", "description": "Render height", "default": 480},
-                    "camera_id": {"type": "integer", "description": "Camera ID", "default": -1}
+                    "camera_id": {"type": "integer", "description": "Camera ID", "default": -1},
                 },
                 "required": ["model_id"],
             },
@@ -297,8 +304,16 @@ async def handle_list_tools() -> List[types.Tool]:
                     "width": {"type": "integer", "description": "Video width", "default": 640},
                     "height": {"type": "integer", "description": "Video height", "default": 480},
                     "fps": {"type": "integer", "description": "Frames per second", "default": 30},
-                    "bitrate": {"type": "string", "description": "Bitrate (e.g. '2M')", "default": "2M"},
-                    "streaming": {"type": "boolean", "description": "Enable streaming mode", "default": False}
+                    "bitrate": {
+                        "type": "string",
+                        "description": "Bitrate (e.g. '2M')",
+                        "default": "2M",
+                    },
+                    "streaming": {
+                        "type": "boolean",
+                        "description": "Enable streaming mode",
+                        "default": False,
+                    },
                 },
                 "required": ["model_id"],
             },
@@ -310,9 +325,17 @@ async def handle_list_tools() -> List[types.Tool]:
                 "type": "object",
                 "properties": {
                     "model_id": {"type": "string", "description": "ID of the model"},
-                    "duration": {"type": "number", "description": "Recording duration in seconds", "default": 5.0},
+                    "duration": {
+                        "type": "number",
+                        "description": "Recording duration in seconds",
+                        "default": 5.0,
+                    },
                     "camera_id": {"type": "integer", "description": "Camera ID", "default": -1},
-                    "return_bytes": {"type": "boolean", "description": "Return video as base64 bytes", "default": True}
+                    "return_bytes": {
+                        "type": "boolean",
+                        "description": "Return video as base64 bytes",
+                        "default": True,
+                    },
                 },
                 "required": ["model_id"],
             },
@@ -419,7 +442,7 @@ async def handle_call_tool(
         if name == "get_server_info":
             egl_info = check_egl_support()
             h264_info = check_h264_support()
-            
+
             result = json.dumps(
                 {
                     "name": "MuJoCo MCP Server (Headless)",
@@ -429,20 +452,20 @@ async def handle_call_tool(
                     "mode": "headless",
                     "capabilities": [
                         "create_scene",
-                        "step_simulation", 
+                        "step_simulation",
                         "get_state",
                         "reset",
                         "no_viewer_required",
                         "egl_gpu_rendering",
                         "h264_video_encoding",
-                        "streaming_video"
+                        "streaming_video",
                     ],
                     "gpu_support": {
                         "egl_available": egl_info.get("egl_available", False),
                         "gpu_rendering": egl_info.get("gpu_available", False),
                         "hardware_h264": len(h264_info.get("hardware_encoders", [])) > 0,
-                        "software_h264": h264_info.get("software_encoder", False)
-                    }
+                        "software_h264": h264_info.get("software_encoder", False),
+                    },
                 },
                 indent=2,
             )
@@ -527,7 +550,9 @@ async def handle_call_tool(
                 if success:
                     result = f"🚀 EGL rendering enabled for '{model_id}' ({width}x{height})"
                 else:
-                    result = f"⚠️ EGL rendering not available, using software fallback for '{model_id}'"
+                    result = (
+                        f"⚠️ EGL rendering not available, using software fallback for '{model_id}'"
+                    )
 
         elif name == "render_egl_frame":
             model_id = arguments["model_id"]
@@ -541,22 +566,20 @@ async def handle_call_tool(
                 sim = simulations[model_id]
                 try:
                     frame = sim.render_frame(width, height, camera_id)
-                    
+
                     # Convert to base64 PNG for transport
                     if PIL_AVAILABLE:
                         img = Image.fromarray(frame)
                         buffer = io.BytesIO()
-                        img.save(buffer, format='PNG')
+                        img.save(buffer, format="PNG")
                         img_b64 = base64.b64encode(buffer.getvalue()).decode()
-                        
-                        return [types.ImageContent(
-                            type="image",
-                            data=img_b64,
-                            mimeType="image/png"
-                        )]
+
+                        return [
+                            types.ImageContent(type="image", data=img_b64, mimeType="image/png")
+                        ]
                     else:
                         result = f"✅ Frame rendered ({width}x{height}) but PIL not available for image encoding"
-                        
+
                 except Exception as e:
                     result = f"❌ Rendering failed: {str(e)}"
 
@@ -578,7 +601,7 @@ async def handle_call_tool(
                 else:
                     success = sim.setup_h264_encoder(width, height, fps, bitrate)
                     encoder_type = "batch"
-                
+
                 if success:
                     result = f"🎥 H.264 {encoder_type} encoder setup for '{model_id}' ({width}x{height}@{fps}fps, {bitrate})"
                 else:
@@ -594,57 +617,59 @@ async def handle_call_tool(
                 result = f"❌ Model '{model_id}' not found."
             else:
                 sim = simulations[model_id]
-                
+
                 # Setup encoder if not already done
                 if not sim._h264_encoder and not sim._streaming_encoder:
                     sim.setup_h264_encoder()
-                
+
                 try:
                     # Record frames
                     fps = 30
                     total_frames = int(duration * fps)
-                    
+
                     for i in range(total_frames):
                         # Step simulation
                         sim.step(1)
-                        
+
                         # Render and add frame
                         frame = sim.render_frame(camera_id=camera_id)
                         chunk = sim.add_frame_to_encoder(frame)
-                        
+
                         # For streaming encoder, handle chunks as they're ready
                         if chunk:
                             # In a real streaming scenario, you'd send this chunk
                             pass
-                    
+
                     # Get final encoded video
                     if sim._streaming_encoder:
                         video_data = sim._streaming_encoder.flush()
                     else:
                         video_data = sim.encode_video()
-                    
+
                     if video_data and return_bytes:
                         video_b64 = base64.b64encode(video_data).decode()
-                        return [types.EmbeddedResource(
-                            type="resource",
-                            resource={
-                                "uri": f"data:video/mp4;base64,{video_b64}",
-                                "mimeType": "video/mp4",
-                                "text": f"H.264 video recording from {model_id} ({duration}s)"
-                            }
-                        )]
+                        return [
+                            types.EmbeddedResource(
+                                type="resource",
+                                resource={
+                                    "uri": f"data:video/mp4;base64,{video_b64}",
+                                    "mimeType": "video/mp4",
+                                    "text": f"H.264 video recording from {model_id} ({duration}s)",
+                                },
+                            )
+                        ]
                     elif video_data:
                         result = f"✅ Video recorded for '{model_id}' ({duration}s, {total_frames} frames, {len(video_data)} bytes)"
                     else:
                         result = f"⚠️ Video recording completed but no data generated (frames: {total_frames})"
-                        
+
                 except Exception as e:
                     result = f"❌ Video recording failed: {str(e)}"
 
         elif name == "check_gpu_support":
             egl_info = check_egl_support()
             h264_info = check_h264_support()
-            
+
             support_info = {
                 "egl_rendering": egl_info,
                 "h264_encoding": h264_info,
@@ -652,10 +677,10 @@ async def handle_call_tool(
                     "egl_available": egl_info.get("egl_available", False),
                     "gpu_rendering": egl_info.get("gpu_available", False),
                     "hardware_h264": len(h264_info.get("hardware_encoders", [])) > 0,
-                    "software_h264": h264_info.get("software_encoder", False)
-                }
+                    "software_h264": h264_info.get("software_encoder", False),
+                },
             }
-            
+
             result = json.dumps(support_info, indent=2)
 
         else:

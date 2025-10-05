@@ -7,6 +7,7 @@ Generates a unified scene with proper worldbody structure, lighting, and floor.
 """
 
 import logging
+import math
 import xml.etree.ElementTree as ET
 from typing import Dict, Optional, Tuple
 
@@ -30,6 +31,13 @@ class SceneXMLBuilder:
 
     def __init__(self, metadata_extractor: MetadataExtractor):
         self.metadata_extractor = metadata_extractor
+        self._primitive_densities = {
+            "box": 500.0,
+            "sphere": 780.0,
+            "cylinder": 780.0,
+            "capsule": 780.0,
+            "ellipsoid": 600.0,
+        }
 
     def build_scene(
         self, scene: SceneDescription, poses: Dict[str, Pose], scene_name: str = "structured_scene"
@@ -186,11 +194,19 @@ class SceneXMLBuilder:
 
             size_str = ""
             rgba_str = ""
+            mass_str = ""
 
             if object_type.startswith("primitive:"):
-                size_str = self._compute_primitive_size(
-                    object_type, dimensions or metadata.get_dimensions(), metadata
+                dims = dimensions or metadata.get_dimensions()
+                size_str = self._compute_primitive_size(object_type, dims, metadata)
+                rgba_str = (
+                    self._format_rgba(color)
+                    if color is not None
+                    else self._format_rgba(self._default_primitive_rgba(metadata))
                 )
+                mass_value = self._compute_primitive_mass(object_type, dims)
+                mass_str = f"{mass_value:.6f}"
+            else:
                 rgba_str = (
                     self._format_rgba(color)
                     if color is not None
@@ -203,6 +219,7 @@ class SceneXMLBuilder:
                 quat=f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
                 size=size_str,
                 rgba=rgba_str,
+                mass=mass_str,
             )
 
             try:
@@ -260,6 +277,7 @@ class SceneXMLBuilder:
             height = dims.get("height", 0.1)
         else:
             width = depth = height = 0.1
+        mass_value = self._compute_fallback_mass(width, depth, height)
 
         # Create simple box geometry
         geom = ET.SubElement(body, "geom")
@@ -268,6 +286,7 @@ class SceneXMLBuilder:
         geom.set("size", f"{width/2:.6f} {depth/2:.6f} {height/2:.6f}")
         rgba_values = color if color is not None else self._default_primitive_rgba(metadata)
         geom.set("rgba", self._format_rgba(rgba_values))
+        geom.set("mass", f"{mass_value:.6f}")
         geom.set("pos", f"0 0 {height/2:.6f}")
 
         logger.debug(f"Added fallback object {object_id} as box")
@@ -339,6 +358,50 @@ class SceneXMLBuilder:
                     float(rgba[3]),
                 )
         return (0.7, 0.7, 0.7, 1.0)
+
+    def _compute_primitive_mass(
+        self, object_type: str, dimensions: Dict[str, float]
+    ) -> float:
+        primitive_shape = object_type.split(":", 1)[1]
+        density = self._primitive_densities.get(primitive_shape, 600.0)
+        volume = self._compute_volume(primitive_shape, dimensions)
+        mass = density * volume
+        return max(mass, 1e-6)
+
+    def _compute_volume(self, primitive_shape: str, dimensions: Dict[str, float]) -> float:
+        shape = primitive_shape.lower()
+
+        if shape == "box":
+            return (
+                dimensions.get("width", 0.1)
+                * dimensions.get("depth", 0.1)
+                * dimensions.get("height", 0.1)
+            )
+        if shape == "sphere":
+            r = dimensions.get("radius", 0.05)
+            return (4.0 / 3.0) * math.pi * r ** 3
+        if shape == "cylinder":
+            r = dimensions.get("radius", 0.05)
+            h = dimensions.get("height", 0.1)
+            return math.pi * r ** 2 * h
+        if shape == "capsule":
+            r = dimensions.get("radius", 0.05)
+            length = dimensions.get("length", 0.1)
+            cylinder_volume = math.pi * r ** 2 * length
+            sphere_volume = (4.0 / 3.0) * math.pi * r ** 3
+            return cylinder_volume + sphere_volume
+        if shape == "ellipsoid":
+            rx = dimensions.get("radius_x", 0.05)
+            ry = dimensions.get("radius_y", 0.05)
+            rz = dimensions.get("radius_z", 0.05)
+            return (4.0 / 3.0) * math.pi * rx * ry * rz
+        logger.warning("Unknown primitive shape '%s' while computing volume", primitive_shape)
+        return 0.001
+
+    def _compute_fallback_mass(self, width: float, depth: float, height: float) -> float:
+        volume = width * depth * height
+        density = self._primitive_densities.get("box", 500.0)
+        return max(density * volume, 1e-6)
 
     def _add_robot_to_worldbody(self, worldbody: ET.Element, robot_config, pose: Pose):
         """Add a robot to the worldbody."""

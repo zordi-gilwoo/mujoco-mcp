@@ -307,7 +307,8 @@ async def demonstrate_robot_control():
 
 
 if __name__ == "__main__":
-    print("""
+    print(
+        """
     ╔══════════════════════════════════════════════════════════╗
     ║     MUJOCO ROBOT CONTROL VIA MCP - FULL DEMONSTRATION   ║
     ╠══════════════════════════════════════════════════════════╣
@@ -318,7 +319,8 @@ if __name__ == "__main__":
     ║  • Sensor feedback and state queries                    ║
     ║  • Multi-robot coordination                             ║
     ╚══════════════════════════════════════════════════════════╝
-    """)
+    """
+    )
 
     try:
         asyncio.run(demonstrate_robot_control())

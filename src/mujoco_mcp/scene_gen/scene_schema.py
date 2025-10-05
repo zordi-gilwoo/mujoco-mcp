@@ -107,6 +107,19 @@ class ObjectPlacement(BaseModel):
                     f"Primitive {primitive_type} missing dimensions: {sorted(missing)}"
                 )
 
+        # Sanity check on primitive dimensions to catch unreasonable values early
+        for key, value in self.dimensions.items():
+            if value <= 0:
+                raise ValueError(f"Dimension '{key}' for {object_type} must be positive")
+            if value < 1e-3:
+                raise ValueError(
+                    f"Dimension '{key}' for {object_type} is too small ({value}); minimum is 1e-3"
+                )
+            if value > 100:
+                raise ValueError(
+                    f"Dimension '{key}' for {object_type} is too large ({value}); maximum is 100"
+                )
+
         return self
 
 

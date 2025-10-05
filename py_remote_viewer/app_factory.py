@@ -6,10 +6,10 @@ from .config import ViewerConfig
 
 def create_app_from_config(config_dict: dict = None):
     """Create FastAPI app from configuration dictionary.
-    
+
     Args:
         config_dict: Configuration dictionary (uses env defaults if None)
-        
+
     Returns:
         Configured FastAPI application
     """
@@ -19,7 +19,7 @@ def create_app_from_config(config_dict: dict = None):
     else:
         # Use environment defaults
         config = ViewerConfig.from_env()
-    
+
     return create_app(config)
 
 
@@ -31,7 +31,7 @@ def create_development_app():
         debug_mode=True,
         log_level="DEBUG",
     )
-    
+
     return create_app(config)
 
 
@@ -43,5 +43,5 @@ def create_production_app():
         debug_mode=False,
         log_level="INFO",
     )
-    
+
     return create_app(config)

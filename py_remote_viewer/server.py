@@ -106,7 +106,8 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
                 with open(client_file) as f:
                     return HTMLResponse(f.read())
             else:
-                return HTMLResponse(f"""
+                return HTMLResponse(
+                    f"""
                 <html>
                     <head><title>MuJoCo Remote Viewer</title></head>
                     <body>
@@ -115,7 +116,8 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
                         <p>Expected client files in: {client_dir}</p>
                     </body>
                 </html>
-                """)
+                """
+                )
         except Exception as e:
             logger.error(f"Error serving client: {e}")
             return HTMLResponse(

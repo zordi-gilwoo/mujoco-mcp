@@ -32,6 +32,7 @@ server = Server("mujoco-mcp")
 # Global viewer client
 viewer_client: Optional[ViewerClient] = None
 
+
 @server.list_tools()
 async def handle_list_tools() -> List[types.Tool]:
     """Return list of available MuJoCo MCP tools"""
@@ -44,8 +45,8 @@ async def handle_list_tools() -> List[types.Tool]:
                 "type": "object",
                 "properties": {},
                 "required": [],
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         ),
         types.Tool(
             name="create_scene",
@@ -57,12 +58,12 @@ async def handle_list_tools() -> List[types.Tool]:
                     "scene_type": {
                         "type": "string",
                         "description": "Type of scene to create",
-                        "enum": ["pendulum", "double_pendulum", "cart_pole", "arm"]
+                        "enum": ["pendulum", "double_pendulum", "cart_pole", "arm"],
                     }
                 },
                 "required": ["scene_type"],
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         ),
         types.Tool(
             name="step_simulation",
@@ -71,20 +72,17 @@ async def handle_list_tools() -> List[types.Tool]:
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
-                    "model_id": {
-                        "type": "string", 
-                        "description": "ID of the model to step"
-                    },
+                    "model_id": {"type": "string", "description": "ID of the model to step"},
                     "steps": {
                         "type": "integer",
                         "description": "Number of simulation steps",
                         "default": 1,
-                        "minimum": 1
-                    }
+                        "minimum": 1,
+                    },
                 },
                 "required": ["model_id"],
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         ),
         types.Tool(
             name="get_state",
@@ -95,12 +93,12 @@ async def handle_list_tools() -> List[types.Tool]:
                 "properties": {
                     "model_id": {
                         "type": "string",
-                        "description": "ID of the model to get state from"
+                        "description": "ID of the model to get state from",
                     }
                 },
                 "required": ["model_id"],
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         ),
         types.Tool(
             name="reset_simulation",
@@ -109,14 +107,11 @@ async def handle_list_tools() -> List[types.Tool]:
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
-                    "model_id": {
-                        "type": "string",
-                        "description": "ID of the model to reset"
-                    }
+                    "model_id": {"type": "string", "description": "ID of the model to reset"}
                 },
                 "required": ["model_id"],
-                "additionalProperties": False
-            }
+                "additionalProperties": False,
+            },
         ),
         types.Tool(
             name="close_viewer",
@@ -125,54 +120,65 @@ async def handle_list_tools() -> List[types.Tool]:
                 "$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
-                    "model_id": {
-                        "type": "string",
-                        "description": "ID of the model viewer to close"
-                    }
+                    "model_id": {"type": "string", "description": "ID of the model viewer to close"}
                 },
                 "required": ["model_id"],
-                "additionalProperties": False
-            }
-        )
+                "additionalProperties": False,
+            },
+        ),
     ]
+
 
 @server.call_tool()
 async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.TextContent]:
     """Handle tool calls with MCP-compliant responses"""
     global viewer_client
-    
+
     # Log the tool call for debugging
     logger.debug(f"Tool call: {name} with arguments: {arguments}")
-    
+
     try:
         if name == "get_server_info":
-            return [types.TextContent(
-                type="text",
-                text=json.dumps({
-                    "name": "MuJoCo MCP Server",
-                    "version": __version__,
-                    "description": "Control MuJoCo physics simulations through MCP",
-                    "status": "ready",
-                    "capabilities": ["create_scene", "step_simulation", "get_state", "reset", "close_viewer"]
-                }, indent=2)
-            )]
-            
+            return [
+                types.TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "name": "MuJoCo MCP Server",
+                            "version": __version__,
+                            "description": "Control MuJoCo physics simulations through MCP",
+                            "status": "ready",
+                            "capabilities": [
+                                "create_scene",
+                                "step_simulation",
+                                "get_state",
+                                "reset",
+                                "close_viewer",
+                            ],
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
         elif name == "create_scene":
             scene_type = arguments.get("scene_type", "pendulum")
-            
+
             # Initialize viewer client if not exists
             if not viewer_client:
                 viewer_client = ViewerClient()
-                
+
             # Connect to viewer server
             if not viewer_client.connected:
                 success = viewer_client.connect()
                 if not success:
-                    return [types.TextContent(
-                        type="text",
-                        text="❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first."
-                    )]
-            
+                    return [
+                        types.TextContent(
+                            type="text",
+                            text="❌ Failed to connect to MuJoCo viewer server. Please start `mujoco-mcp-viewer` first.",
+                        )
+                    ]
+
             # Map scene types to model XML
             scene_models = {
                 "pendulum": """
@@ -218,172 +224,175 @@ async def handle_call_tool(name: str, arguments: Dict[str, Any]) -> List[types.T
                         </body>
                     </worldbody>
                 </mujoco>
-                """
+                """,
             }
-            
+
             if scene_type not in scene_models:
-                return [types.TextContent(
-                    type="text",
-                    text=f"❌ Unknown scene type: {scene_type}. Available: {', '.join(scene_models.keys())}"
-                )]
-            
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"❌ Unknown scene type: {scene_type}. Available: {', '.join(scene_models.keys())}",
+                    )
+                ]
+
             # Load the model
-            response = viewer_client.send_command({
-                "type": "load_model",
-                "model_id": scene_type,
-                "model_xml": scene_models[scene_type]
-            })
-            
+            response = viewer_client.send_command(
+                {
+                    "type": "load_model",
+                    "model_id": scene_type,
+                    "model_xml": scene_models[scene_type],
+                }
+            )
+
             if response.get("success"):
-                return [types.TextContent(
-                    type="text",
-                    text=f"✅ Created {scene_type} scene successfully! Viewer window opened."
-                )]
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"✅ Created {scene_type} scene successfully! Viewer window opened.",
+                    )
+                ]
             else:
-                return [types.TextContent(
-                    type="text", 
-                    text=f"❌ Failed to create scene: {response.get('error', 'Unknown error')}"
-                )]
-                
+                return [
+                    types.TextContent(
+                        type="text",
+                        text=f"❌ Failed to create scene: {response.get('error', 'Unknown error')}",
+                    )
+                ]
+
         elif name == "step_simulation":
             model_id = arguments.get("model_id")
             steps = arguments.get("steps", 1)
-            
+
             if not viewer_client or not viewer_client.connected:
-                return [types.TextContent(
-                    type="text",
-                    text="❌ No active viewer connection. Create a scene first."
-                )]
-                
+                return [
+                    types.TextContent(
+                        type="text", text="❌ No active viewer connection. Create a scene first."
+                    )
+                ]
+
             # The viewer server doesn't have a direct step_simulation command
             # It automatically runs the simulation, so we just return success
             response = {"success": True, "message": f"Simulation running for model {model_id}"}
-            
-            return [types.TextContent(
-                type="text",
-                text=f"⏩ Stepped simulation {steps} steps" if response.get("success") 
-                     else f"❌ Step failed: {response.get('error')}"
-            )]
-            
+
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        f"⏩ Stepped simulation {steps} steps"
+                        if response.get("success")
+                        else f"❌ Step failed: {response.get('error')}"
+                    ),
+                )
+            ]
+
         elif name == "get_state":
             model_id = arguments.get("model_id")
-            
+
             if not viewer_client or not viewer_client.connected:
-                return [types.TextContent(
-                    type="text",
-                    text="❌ No active viewer connection. Create a scene first."
-                )]
-                
-            response = viewer_client.send_command({
-                "type": "get_state",
-                "model_id": model_id
-            })
-            
+                return [
+                    types.TextContent(
+                        type="text", text="❌ No active viewer connection. Create a scene first."
+                    )
+                ]
+
+            response = viewer_client.send_command({"type": "get_state", "model_id": model_id})
+
             if response.get("success"):
                 state = response.get("state", {})
-                return [types.TextContent(
-                    type="text",
-                    text=json.dumps(state, indent=2)
-                )]
+                return [types.TextContent(type="text", text=json.dumps(state, indent=2))]
             else:
-                return [types.TextContent(
-                    type="text",
-                    text=f"❌ Failed to get state: {response.get('error')}"
-                )]
-                
+                return [
+                    types.TextContent(
+                        type="text", text=f"❌ Failed to get state: {response.get('error')}"
+                    )
+                ]
+
         elif name == "reset_simulation":
             model_id = arguments.get("model_id")
-            
+
             if not viewer_client or not viewer_client.connected:
-                return [types.TextContent(
+                return [
+                    types.TextContent(
+                        type="text", text="❌ No active viewer connection. Create a scene first."
+                    )
+                ]
+
+            response = viewer_client.send_command({"type": "reset", "model_id": model_id})
+
+            return [
+                types.TextContent(
                     type="text",
-                    text="❌ No active viewer connection. Create a scene first."
-                )]
-                
-            response = viewer_client.send_command({
-                "type": "reset",
-                "model_id": model_id
-            })
-            
-            return [types.TextContent(
-                type="text",
-                text="🔄 Simulation reset to initial state" if response.get("success")
-                     else f"❌ Reset failed: {response.get('error')}"
-            )]
-            
+                    text=(
+                        "🔄 Simulation reset to initial state"
+                        if response.get("success")
+                        else f"❌ Reset failed: {response.get('error')}"
+                    ),
+                )
+            ]
+
         elif name == "close_viewer":
             model_id = arguments.get("model_id")
-            
+
             if not viewer_client or not viewer_client.connected:
-                return [types.TextContent(
-                    type="text",
-                    text="❌ No active viewer connection."
-                )]
-                
-            response = viewer_client.send_command({
-                "type": "close_model",
-                "model_id": model_id
-            })
-            
+                return [types.TextContent(type="text", text="❌ No active viewer connection.")]
+
+            response = viewer_client.send_command({"type": "close_model", "model_id": model_id})
+
             # Close our connection too
             if viewer_client:
                 viewer_client.disconnect()
                 viewer_client = None
-                
-            return [types.TextContent(
-                type="text",
-                text="❌ Viewer closed" if response.get("success")
-                     else f"❌ Failed to close: {response.get('error')}"
-            )]
-        
+
+            return [
+                types.TextContent(
+                    type="text",
+                    text=(
+                        "❌ Viewer closed"
+                        if response.get("success")
+                        else f"❌ Failed to close: {response.get('error')}"
+                    ),
+                )
+            ]
+
         else:
-            return [types.TextContent(
-                type="text",
-                text=f"❌ Unknown tool: {name}"
-            )]
-            
+            return [types.TextContent(type="text", text=f"❌ Unknown tool: {name}")]
+
     except Exception as e:
         logger.exception(f"Error in tool {name}")
-        return [types.TextContent(
-            type="text", 
-            text=f"❌ Error: {str(e)}"
-        )]
+        return [types.TextContent(type="text", text=f"❌ Error: {str(e)}")]
+
 
 async def main():
     """Main entry point for MCP server"""
     logger.info(f"Starting MuJoCo MCP Server v{__version__}")
     logger.info(f"MCP Protocol Version: {MCP_PROTOCOL_VERSION}")
-    
+
     # Initialize server capabilities with enhanced configuration
     capabilities = server.get_capabilities(
-        notification_options=NotificationOptions(),
-        experimental_capabilities={}
+        notification_options=NotificationOptions(), experimental_capabilities={}
     )
-    
+
     server_options = InitializationOptions(
         server_name="mujoco-mcp",
         server_version=__version__,
         capabilities=capabilities,
         instructions="MuJoCo physics simulation server with viewer support. "
-                    f"Implements MCP Protocol {MCP_PROTOCOL_VERSION}. "
-                    "Provides tools for creating scenes, controlling simulation, and managing state."
+        f"Implements MCP Protocol {MCP_PROTOCOL_VERSION}. "
+        "Provides tools for creating scenes, controlling simulation, and managing state.",
     )
-    
+
     logger.info(f"Server capabilities: {capabilities}")
     logger.info("MCP server initialization complete")
-    
+
     # Run server with stdio transport
     try:
         async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
             logger.info("Starting MCP server stdio transport")
-            await server.run(
-                read_stream,
-                write_stream,
-                server_options
-            )
+            await server.run(read_stream, write_stream, server_options)
     except Exception as e:
         logger.error(f"MCP server error: {e}")
         raise
+
 
 if __name__ == "__main__":
     asyncio.run(main())

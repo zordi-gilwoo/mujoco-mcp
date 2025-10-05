@@ -17,27 +17,27 @@ def main():
     parser.add_argument("--host", default="localhost", help="Host to bind to (default: localhost)")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to (default: 8080)")
     parser.add_argument("--debug", action="store_true", help="Enable debug logging")
-    
+
     args = parser.parse_args()
-    
+
     # Set up logging
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
-    
+
     logger = logging.getLogger("mujoco_mcp.monitor_launcher")
-    
+
     async def run_monitor():
         try:
             logger.info(f"Starting MuJoCo MCP Client Monitor...")
             logger.info(f"Web interface will be available at: http://{args.host}:{args.port}")
-            
+
             runner = await start_monitor_server(args.host, args.port)
-            
-            print("\n" + "="*60)
+
+            print("\n" + "=" * 60)
             print("🎮 MuJoCo MCP Client Monitor Started")
-            print("="*60)
+            print("=" * 60)
             print(f"📊 Web Dashboard: http://{args.host}:{args.port}")
             print(f"🔗 API Endpoint: http://{args.host}:{args.port}/api/monitor")
             print(f"🔌 WebSocket: ws://{args.host}:{args.port}/ws")
@@ -50,8 +50,8 @@ def main():
             print("  • The dashboard updates every 2 seconds")
             print("  • Check 'System Health' for capacity warnings")
             print("  • Use Ctrl+C to stop the monitor")
-            print("="*60)
-            
+            print("=" * 60)
+
             # Keep running
             try:
                 while True:
@@ -60,11 +60,11 @@ def main():
                 logger.info("Shutting down monitor...")
                 await runner.cleanup()
                 print("\n👋 Monitor stopped gracefully")
-            
+
         except Exception as e:
             logger.error(f"Error starting monitor: {e}")
             sys.exit(1)
-    
+
     try:
         asyncio.run(run_monitor())
     except KeyboardInterrupt:

@@ -30,7 +30,7 @@ from .enhanced_collision import (
     GlobalCollisionOptimizer,
     RotationAwareAABB,
     PhysicsCollisionValidator,
-    CollisionInfo
+    CollisionInfo,
 )
 
 # Phase 2B: Advanced spatial reasoning
@@ -40,7 +40,7 @@ from .spatial_reasoning import (
     RobotReachabilityChecker,
     StablePose,
     WorkspaceVolume,
-    SupportSurface
+    SupportSurface,
 )
 
 # Phase 2C: Symbolic plan interface
@@ -51,7 +51,7 @@ from .symbolic_plan import (
     PlanToSceneConverter,
     PlanValidator,
     OperationType,
-    ConstraintCategory
+    ConstraintCategory,
 )
 
 # Phase 2D: Enhanced asset semantics
@@ -64,7 +64,7 @@ from .enhanced_semantics import (
     RobotMountingRule,
     AssetCategory,
     GraspType,
-    SurfaceType
+    SurfaceType,
 )
 
 # Phase 2E: Robust constraint solver
@@ -73,45 +73,41 @@ from .robust_solver import (
     ConstraintConflict,
     PlacementSolution,
     GlobalSceneState,
-    ConstraintConflictType
+    ConstraintConflictType,
 )
 
 __all__ = [
     # Core components
     "SpatialConstraint",
-    "ObjectPlacement", 
+    "ObjectPlacement",
     "RobotConfiguration",
     "SceneDescription",
     "Pose",
-    "AABBBox", 
+    "AABBBox",
     "MetadataExtractor",
     "ConstraintSolver",
-    "SceneXMLBuilder", 
+    "SceneXMLBuilder",
     "LLMSceneGenerator",
-    
     # Phase 2A: Enhanced collision detection
     "GlobalCollisionOptimizer",
-    "RotationAwareAABB", 
+    "RotationAwareAABB",
     "PhysicsCollisionValidator",
     "CollisionInfo",
-    
     # Phase 2B: Advanced spatial reasoning
     "AdvancedSpatialReasoner",
     "StablePoseDatabase",
-    "RobotReachabilityChecker", 
+    "RobotReachabilityChecker",
     "StablePose",
     "WorkspaceVolume",
     "SupportSurface",
-    
     # Phase 2C: Symbolic plan interface
     "SymbolicPlan",
-    "SymbolicOperation", 
+    "SymbolicOperation",
     "SymbolicPlanGenerator",
     "PlanToSceneConverter",
     "PlanValidator",
     "OperationType",
     "ConstraintCategory",
-    
     # Phase 2D: Enhanced asset semantics
     "EnhancedAssetMetadata",
     "EnhancedAssetDatabase",
@@ -122,11 +118,10 @@ __all__ = [
     "AssetCategory",
     "GraspType",
     "SurfaceType",
-    
     # Phase 2E: Robust constraint solver
     "RobustConstraintSolver",
     "ConstraintConflict",
-    "PlacementSolution", 
+    "PlacementSolution",
     "GlobalSceneState",
     "ConstraintConflictType",
 ]

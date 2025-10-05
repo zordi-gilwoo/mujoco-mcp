@@ -439,9 +439,9 @@ class RobotStateMonitor:
 
         analysis = {
             "duration": timestamps[-1] - timestamps[0] if len(timestamps) > 1 else 0,
-            "sample_rate": len(timestamps) / (timestamps[-1] - timestamps[0])
-            if len(timestamps) > 1
-            else 0,
+            "sample_rate": (
+                len(timestamps) / (timestamps[-1] - timestamps[0]) if len(timestamps) > 1 else 0
+            ),
             "joint_statistics": {},
             "motion_metrics": {},
         }

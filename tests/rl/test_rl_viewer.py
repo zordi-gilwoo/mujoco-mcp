@@ -8,7 +8,7 @@ import sys
 import os
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from mujoco_mcp.rl_runner import rl_runner, create_and_run_rl_environment
 
@@ -17,16 +17,16 @@ async def test_rl_viewer_functionality():
     """Test the complete RL viewer functionality"""
     print("🧪 Testing RL Environment Viewer Functionality")
     print("=" * 60)
-    
+
     # Test environment configuration
     config = {
-        'robot_type': 'simple_arm',
-        'task_type': 'reaching',
-        'max_episode_steps': 100,
-        'action_space_type': 'continuous',
-        'reward_scale': 1.0
+        "robot_type": "simple_arm",
+        "task_type": "reaching",
+        "max_episode_steps": 100,
+        "action_space_type": "continuous",
+        "reward_scale": 1.0,
     }
-    
+
     xml_content = """<mujoco model="simple_arm">
     <option timestep="0.002"/>
     <worldbody>
@@ -49,7 +49,7 @@ async def test_rl_viewer_functionality():
         </body>
     </worldbody>
 </mujoco>"""
-    
+
     print("1. Testing RL environment creation...")
     success = await rl_runner.create_environment(config)
     if success:
@@ -57,36 +57,36 @@ async def test_rl_viewer_functionality():
     else:
         print("❌ Failed to create RL environment")
         return False
-    
+
     print("\n2. Testing environment status...")
     status = rl_runner.get_status()
     print(f"   Environment type: {status['environment_type']}")
     print(f"   Is running: {status['is_running']}")
-    
+
     print("\n3. Testing random action simulation (brief)...")
     if await rl_runner.start_random_actions(num_steps=50, step_delay=0.001):
         print("✅ Random actions started successfully")
-        
+
         # Let it run briefly
         await asyncio.sleep(1)
-        
+
         # Check status during run
         status = rl_runner.get_status()
         print(f"   Steps completed: {status['total_steps']}")
         print(f"   Episodes: {status['current_episode']}")
         print(f"   Total reward: {status['total_reward']:.3f}")
-        
+
         # Stop the environment
         await rl_runner.stop_environment()
         print("✅ RL environment stopped successfully")
     else:
         print("❌ Failed to start random actions")
         return False
-    
+
     print("\n4. Testing cleanup...")
     rl_runner.cleanup()
     print("✅ Cleanup completed")
-    
+
     print("\n🎉 All RL viewer tests passed!")
     return True
 

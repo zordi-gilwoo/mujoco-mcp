@@ -187,7 +187,8 @@ async def demonstrate_working_mcp():
 
 
 if __name__ == "__main__":
-    print("""
+    print(
+        """
     ╔══════════════════════════════════════════════════════════╗
     ║          WORKING MUJOCO MCP DEMONSTRATION                ║
     ╠══════════════════════════════════════════════════════════╣
@@ -197,7 +198,8 @@ if __name__ == "__main__":
     ║  • Perfect for SSH, Docker, cloud environments         ║
     ║  • Full physics simulation capabilities                 ║
     ╚══════════════════════════════════════════════════════════╝
-    """)
+    """
+    )
 
     try:
         success = asyncio.run(demonstrate_working_mcp())

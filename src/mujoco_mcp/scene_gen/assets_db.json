@@ -21,7 +21,7 @@
         "min": [-0.05, -0.05, -0.05],
         "max": [0.05, 0.05, 0.05]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"box\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"box\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
     "primitive:sphere": {
       "type": "primitive",
@@ -40,7 +40,7 @@
         "min": [-0.05, -0.05, -0.05],
         "max": [0.05, 0.05, 0.05]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"sphere\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"sphere\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
     "primitive:cylinder": {
       "type": "primitive",
@@ -60,7 +60,7 @@
         "min": [-0.05, -0.05, -0.05],
         "max": [0.05, 0.05, 0.05]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"cylinder\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"cylinder\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
     "primitive:capsule": {
       "type": "primitive",
@@ -80,7 +80,7 @@
         "min": [-0.05, -0.05, -0.1],
         "max": [0.05, 0.05, 0.1]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"capsule\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"capsule\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
     "primitive:ellipsoid": {
       "type": "primitive",
@@ -101,7 +101,7 @@
         "min": [-0.05, -0.05, -0.05],
         "max": [0.05, 0.05, 0.05]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"ellipsoid\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"ellipsoid\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
     "table_standard": {
       "type": "table",
@@ -120,7 +120,7 @@
         "min": [-0.6, -0.4, 0],
         "max": [0.6, 0.4, 0.75]
       },
-      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_top\" type=\"box\" size=\"0.6 0.4 0.02\" pos=\"0 0 0.73\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/></body>"
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_top\" type=\"box\" size=\"0.6 0.4 0.02\" pos=\"0 0 0.73\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_leg1\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_leg2\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_leg3\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_leg4\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/></body>"
     },
     "shelf_small": {
       "type": "storage",

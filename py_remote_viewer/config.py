@@ -8,25 +8,25 @@ from dataclasses import dataclass
 @dataclass
 class ViewerConfig:
     """Configuration for the remote viewer server."""
-    
+
     # Server settings
     host: str = "localhost"
     port: int = 8000
-    
+
     # Frame generation settings
     frame_width: int = 640
     frame_height: int = 480
     frame_rate: int = 30
-    
+
     # WebRTC settings
     stun_server: str = "stun:stun.l.google.com:19302"
-    
+
     # Development settings
     debug_mode: bool = False
-    
+
     # Logging settings
     log_level: str = "INFO"
-    
+
     @classmethod
     def from_env(cls) -> "ViewerConfig":
         """Create configuration from environment variables."""
@@ -40,7 +40,7 @@ class ViewerConfig:
             debug_mode=os.getenv("DEBUG_MODE", "0") == "1",
             log_level=os.getenv("LOG_LEVEL", cls.log_level),
         )
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert configuration to dictionary."""
         return {

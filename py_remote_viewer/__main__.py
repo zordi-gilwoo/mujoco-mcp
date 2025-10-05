@@ -11,38 +11,27 @@ def main():
     parser = argparse.ArgumentParser(
         description="MuJoCo Remote Viewer - Python-based headless WebRTC viewer"
     )
-    
+
+    parser.add_argument("--host", default=None, help="Server host (default: from env or localhost)")
+
     parser.add_argument(
-        "--host",
-        default=None,
-        help="Server host (default: from env or localhost)"
+        "--port", type=int, default=None, help="Server port (default: from env or 8000)"
     )
-    
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=None,
-        help="Server port (default: from env or 8000)"
-    )
-    
+
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default=None,
-        help="Logging level (default: from env or INFO)"
+        help="Logging level (default: from env or INFO)",
     )
-    
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Enable debug mode"
-    )
-    
+
+    parser.add_argument("--debug", action="store_true", help="Enable debug mode")
+
     args = parser.parse_args()
-    
+
     # Create configuration
     config = ViewerConfig.from_env()
-    
+
     # Override with command line arguments
     if args.host:
         config.host = args.host
@@ -52,12 +41,12 @@ def main():
         config.log_level = args.log_level
     if args.debug:
         config.debug_mode = True
-    
+
     print(f"🚀 Starting MuJoCo Remote Viewer")
     print(f"📍 Server: http://{config.host}:{config.port}")
     print(f"🐛 Debug mode: {config.debug_mode}")
     print()
-    
+
     try:
         run_server(config=config)
     except KeyboardInterrupt:

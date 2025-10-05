@@ -9,7 +9,7 @@ import sys
 import asyncio
 
 # Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from mujoco_mcp.rl_integration import create_reaching_env, create_balancing_env
 from mujoco_mcp.rl_runner import rl_runner
@@ -19,53 +19,53 @@ def demonstrate_rl_environment_parsing():
     """Demonstrate how RL prompts are parsed into environments"""
     print("🧠 RL Environment Parsing Demo")
     print("=" * 40)
-    
+
     # Simulate the parsing logic from our JavaScript
     test_prompts = [
         "Create a reaching task for Franka Panda to reach random targets with continuous actions",
         "Design a cart-pole balancing environment with discrete actions",
         "Build a quadruped walking environment with gait rewards",
-        "Create a simple 2-DOF arm reaching task with sparse rewards"
+        "Create a simple 2-DOF arm reaching task with sparse rewards",
     ]
-    
+
     for i, prompt in enumerate(test_prompts, 1):
         print(f"\n{i}. Prompt: {prompt}")
-        
+
         # Parse prompt (same logic as JavaScript)
         config = {
-            'task_type': 'reaching',
-            'robot_type': 'simple_arm',  
-            'action_space_type': 'continuous',
-            'max_episode_steps': 1000,
-            'reward_scale': 1.0
+            "task_type": "reaching",
+            "robot_type": "simple_arm",
+            "action_space_type": "continuous",
+            "max_episode_steps": 1000,
+            "reward_scale": 1.0,
         }
-        
+
         prompt_lower = prompt.lower()
-        
+
         # Detect task type
-        if 'reach' in prompt_lower:
-            config['task_type'] = 'reaching'
-        elif 'balanc' in prompt_lower:
-            config['task_type'] = 'balancing'
-        elif 'walk' in prompt_lower:
-            config['task_type'] = 'walking'
-        
+        if "reach" in prompt_lower:
+            config["task_type"] = "reaching"
+        elif "balanc" in prompt_lower:
+            config["task_type"] = "balancing"
+        elif "walk" in prompt_lower:
+            config["task_type"] = "walking"
+
         # Detect robot type
-        if 'franka' in prompt_lower or 'panda' in prompt_lower:
-            config['robot_type'] = 'franka_panda'
-        elif 'cart' in prompt_lower and 'pole' in prompt_lower:
-            config['robot_type'] = 'cart_pole'
-        elif 'quadruped' in prompt_lower:
-            config['robot_type'] = 'quadruped'
-        elif 'simple' in prompt_lower and 'arm' in prompt_lower:
-            config['robot_type'] = 'simple_arm'
-        
+        if "franka" in prompt_lower or "panda" in prompt_lower:
+            config["robot_type"] = "franka_panda"
+        elif "cart" in prompt_lower and "pole" in prompt_lower:
+            config["robot_type"] = "cart_pole"
+        elif "quadruped" in prompt_lower:
+            config["robot_type"] = "quadruped"
+        elif "simple" in prompt_lower and "arm" in prompt_lower:
+            config["robot_type"] = "simple_arm"
+
         # Detect action space
-        if 'discrete' in prompt_lower:
-            config['action_space_type'] = 'discrete'
-        elif 'continuous' in prompt_lower:
-            config['action_space_type'] = 'continuous'
-        
+        if "discrete" in prompt_lower:
+            config["action_space_type"] = "discrete"
+        elif "continuous" in prompt_lower:
+            config["action_space_type"] = "continuous"
+
         print(f"   → Task: {config['task_type']}")
         print(f"   → Robot: {config['robot_type']}")
         print(f"   → Actions: {config['action_space_type']}")
@@ -149,56 +149,56 @@ async def demonstrate_environment_execution():
     """Demonstrate actual RL environment execution"""
     print("\n🚀 RL Environment Execution Demo")
     print("=" * 42)
-    
+
     # Test different environment types
     environments = [
         {
-            'name': 'Simple Arm Reaching',
-            'config': {
-                'robot_type': 'simple_arm',
-                'task_type': 'reaching',
-                'max_episode_steps': 50,
-                'action_space_type': 'continuous'
-            }
+            "name": "Simple Arm Reaching",
+            "config": {
+                "robot_type": "simple_arm",
+                "task_type": "reaching",
+                "max_episode_steps": 50,
+                "action_space_type": "continuous",
+            },
         },
         {
-            'name': 'Cart-Pole Balancing',
-            'config': {
-                'robot_type': 'cart_pole',
-                'task_type': 'balancing',
-                'max_episode_steps': 100,
-                'action_space_type': 'discrete'
-            }
-        }
+            "name": "Cart-Pole Balancing",
+            "config": {
+                "robot_type": "cart_pole",
+                "task_type": "balancing",
+                "max_episode_steps": 100,
+                "action_space_type": "discrete",
+            },
+        },
     ]
-    
+
     for env_info in environments:
         print(f"\n--- {env_info['name']} ---")
-        
+
         # Create environment
-        if await rl_runner.create_environment(env_info['config']):
+        if await rl_runner.create_environment(env_info["config"]):
             print("✅ Environment created")
-            
+
             # Get initial status
             status = rl_runner.get_status()
             print(f"   Type: {status['environment_type']}")
-            
+
             # Run briefly with random actions
             if await rl_runner.start_random_actions(num_steps=20, step_delay=0.001):
                 print("🎮 Running random actions...")
-                
+
                 # Let it run
                 await asyncio.sleep(0.5)
-                
+
                 # Check progress
                 status = rl_runner.get_status()
                 print(f"   Completed {status['total_steps']} steps")
                 print(f"   Total reward: {status['total_reward']:.3f}")
-                
+
                 # Stop
                 await rl_runner.stop_environment()
                 print("⏹️  Stopped")
-            
+
             # Cleanup
             rl_runner.cleanup()
         else:
@@ -209,47 +209,47 @@ def print_viewer_features():
     """Print summary of viewer features implemented"""
     print("\n🎯 RL Environment Viewer Features")
     print("=" * 42)
-    
+
     features = [
         "✅ Text prompt for creating RL environments",
         "✅ Dropdown with predefined RL environment examples:",
         "   • Franka Panda Reaching Task",
-        "   • Cart-Pole Balancing", 
+        "   • Cart-Pole Balancing",
         "   • Quadruped Walking",
         "   • Simple Arm Reaching",
         "✅ Structural guidelines for RL environment creation",
         "✅ Tab system in XML editor showing:",
         "   • Generated MuJoCo XML",
-        "   • Python gymnasium environment code", 
+        "   • Python gymnasium environment code",
         "✅ Live editing capability for environments",
         "✅ 'Run Random Actions' button for execution",
         "✅ Real-time status monitoring",
         "✅ Event logging and progress tracking",
-        "✅ Integration with existing MuJoCo viewer"
+        "✅ Integration with existing MuJoCo viewer",
     ]
-    
+
     for feature in features:
         print(feature)
-    
+
     print("\n📋 Supported Environment Types:")
     env_types = [
         "• Franka Panda (franka_panda) - 7-DOF robotic arm",
         "• Cart-Pole (cart_pole) - Classic balancing task",
         "• Quadruped (quadruped) - 4-legged walking robot",
-        "• Simple Arm (simple_arm) - 2-DOF robotic arm"
+        "• Simple Arm (simple_arm) - 2-DOF robotic arm",
     ]
-    
+
     for env_type in env_types:
         print(env_type)
-    
+
     print("\n🎮 Task Types:")
     task_types = [
         "• Reaching - Move end-effector to target position",
-        "• Balancing - Maintain system stability", 
+        "• Balancing - Maintain system stability",
         "• Walking - Locomotion and gait control",
-        "• Manipulation - Object interaction tasks"
+        "• Manipulation - Object interaction tasks",
     ]
-    
+
     for task_type in task_types:
         print(task_type)
 
@@ -263,30 +263,30 @@ async def main():
     print("2. Code generation (XML + Python)")
     print("3. Environment execution with random actions")
     print("4. Integration with MuJoCo viewer")
-    
+
     # Demonstrate prompt parsing
     demonstrate_rl_environment_parsing()
-    
+
     # Show code generation example
     print("\n💻 Generated Python Code Example")
     print("=" * 40)
     config = {
-        'task_type': 'reaching',
-        'robot_type': 'franka_panda', 
-        'action_space_type': 'continuous',
-        'max_episode_steps': 1000,
-        'reward_scale': 1.0
+        "task_type": "reaching",
+        "robot_type": "franka_panda",
+        "action_space_type": "continuous",
+        "max_episode_steps": 1000,
+        "reward_scale": 1.0,
     }
     print("Sample generated code (truncated):")
     code = generate_python_code_example(config)
     print(code[:500] + "...\n# (truncated)")
-    
+
     # Demonstrate actual execution
     await demonstrate_environment_execution()
-    
+
     # Print feature summary
     print_viewer_features()
-    
+
     print("\n🎉 Demo completed! The RL Environment Viewer is ready to use.")
     print("   Open client/index.html in a browser to try the interactive interface.")
 
