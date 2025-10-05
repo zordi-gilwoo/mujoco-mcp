@@ -1663,15 +1663,20 @@ if __name__ == "__main__":
                 
                 const result = await response.json();
                 
+                console.log('[RemoteViewer] Scene generation result:', result);
+                
                 if (response.ok && result.success) {
                     // Load the generated scene
-                    if (result.xml) {
-                        await this.loadSceneFromXML(result.xml);
-                        this.showCommandResult('success', `Scene generated successfully: ${result.description || 'Scene loaded'}`);
-                        this.logEvent('Command', 'AI scene generation successful');
+                    if (result.scene_xml || result.xml) {
+                        const xml = result.scene_xml || result.xml;
+                        console.log('[RemoteViewer] Loading generated XML:', xml.substring(0, 200) + '...');
+                        await this.loadSceneFromXML(xml);
+                        this.showCommandResult('success', `Scene generated and loaded: ${result.message || 'Scene loaded'}`);
+                        this.logEvent('Command', '✓ AI scene generated and loaded into viewer');
                     } else {
-                        this.showCommandResult('success', result.description || 'Scene generated successfully');
-                        this.logEvent('Command', 'AI scene generation completed');
+                        console.warn('[RemoteViewer] No XML in result:', result);
+                        this.showCommandResult('error', 'Scene generation succeeded but no XML was returned');
+                        this.logEvent('Error', 'No XML returned from scene generation');
                     }
                 } else {
                     throw new Error(result.error || 'Scene generation failed');
