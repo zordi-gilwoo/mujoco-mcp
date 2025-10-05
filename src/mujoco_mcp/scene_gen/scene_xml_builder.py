@@ -29,14 +29,19 @@ class SceneXMLBuilder:
     - Proper XML structure and naming
     """
 
-    def __init__(self, metadata_extractor: MetadataExtractor):
+    def __init__(self, metadata_extractor: MetadataExtractor, menagerie_loader=None):
         self.metadata_extractor = metadata_extractor
+        self.menagerie_loader = menagerie_loader
         self._primitive_densities = {
             "box": 500.0,
             "sphere": 780.0,
             "cylinder": 780.0,
             "capsule": 780.0,
             "ellipsoid": 600.0,
+        }
+        # Robot model name mapping (scene_gen name -> menagerie name)
+        self._robot_model_mapping = {
+            "franka_panda": "franka_emika_panda",
         }
 
     def build_scene(
@@ -283,11 +288,11 @@ class SceneXMLBuilder:
         geom = ET.SubElement(body, "geom")
         geom.set("name", f"{object_id}_geom")
         geom.set("type", "box")
-        geom.set("size", f"{width/2:.6f} {depth/2:.6f} {height/2:.6f}")
+        geom.set("size", f"{width / 2:.6f} {depth / 2:.6f} {height / 2:.6f}")
         rgba_values = color if color is not None else self._default_primitive_rgba(metadata)
         geom.set("rgba", self._format_rgba(rgba_values))
         geom.set("mass", f"{mass_value:.6f}")
-        geom.set("pos", f"0 0 {height/2:.6f}")
+        geom.set("pos", f"0 0 {height / 2:.6f}")
 
         logger.debug(f"Added fallback object {object_id} as box")
 
@@ -315,14 +320,10 @@ class SceneXMLBuilder:
             return f"{dimensions.get('radius', 0.05):.6f}"
 
         if shape == "cylinder":
-            return (
-                f"{dimensions.get('radius', 0.05):.6f} " f"{dimensions.get('height', 0.1) / 2:.6f}"
-            )
+            return f"{dimensions.get('radius', 0.05):.6f} {dimensions.get('height', 0.1) / 2:.6f}"
 
         if shape == "capsule":
-            return (
-                f"{dimensions.get('radius', 0.05):.6f} " f"{dimensions.get('length', 0.1) / 2:.6f}"
-            )
+            return f"{dimensions.get('radius', 0.05):.6f} {dimensions.get('length', 0.1) / 2:.6f}"
 
         if shape == "ellipsoid":
             return (
@@ -359,9 +360,7 @@ class SceneXMLBuilder:
                 )
         return (0.7, 0.7, 0.7, 1.0)
 
-    def _compute_primitive_mass(
-        self, object_type: str, dimensions: Dict[str, float]
-    ) -> float:
+    def _compute_primitive_mass(self, object_type: str, dimensions: Dict[str, float]) -> float:
         primitive_shape = object_type.split(":", 1)[1]
         density = self._primitive_densities.get(primitive_shape, 600.0)
         volume = self._compute_volume(primitive_shape, dimensions)
@@ -379,16 +378,16 @@ class SceneXMLBuilder:
             )
         if shape == "sphere":
             r = dimensions.get("radius", 0.05)
-            return (4.0 / 3.0) * math.pi * r ** 3
+            return (4.0 / 3.0) * math.pi * r**3
         if shape == "cylinder":
             r = dimensions.get("radius", 0.05)
             h = dimensions.get("height", 0.1)
-            return math.pi * r ** 2 * h
+            return math.pi * r**2 * h
         if shape == "capsule":
             r = dimensions.get("radius", 0.05)
             length = dimensions.get("length", 0.1)
-            cylinder_volume = math.pi * r ** 2 * length
-            sphere_volume = (4.0 / 3.0) * math.pi * r ** 3
+            cylinder_volume = math.pi * r**2 * length
+            sphere_volume = (4.0 / 3.0) * math.pi * r**3
             return cylinder_volume + sphere_volume
         if shape == "ellipsoid":
             rx = dimensions.get("radius_x", 0.05)
@@ -404,38 +403,58 @@ class SceneXMLBuilder:
         return max(density * volume, 1e-6)
 
     def _add_robot_to_worldbody(self, worldbody: ET.Element, robot_config, pose: Pose):
-        """Add a robot to the worldbody."""
+        """Add a robot to the worldbody using Menagerie model."""
         robot_id = robot_config.robot_id
         robot_type = robot_config.robot_type
 
-        metadata = self.metadata_extractor.get_metadata(robot_type)
-
-        if metadata and metadata.xml_template:
-            # Use template from metadata
-            xml_template = metadata.xml_template
-
-            # Format template with pose information
-            formatted_xml = xml_template.format(
-                name=robot_id,
-                pos=f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}",
-                quat=f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
-            )
+        # Try to load from Menagerie if loader is available
+        if self.menagerie_loader:
+            # Map scene_gen robot name to menagerie model name
+            menagerie_name = self._robot_model_mapping.get(robot_type, robot_type)
 
             try:
-                # Parse the formatted XML and add to worldbody
-                robot_element = ET.fromstring(formatted_xml)
+                # Get the robot XML from Menagerie
+                robot_xml = self.menagerie_loader.get_model_xml(menagerie_name)
 
-                # Add joint configuration if available
-                self._configure_robot_joints(robot_element, robot_config, metadata)
+                # Parse the Menagerie XML to extract the robot body
+                robot_root = ET.fromstring(robot_xml)
 
-                worldbody.append(robot_element)
-                logger.debug(f"Added robot {robot_id} using template")
-            except ET.ParseError as e:
-                logger.warning(f"Failed to parse XML template for {robot_id}: {e}")
-                self._add_fallback_robot(worldbody, robot_id, robot_type, pose)
-        else:
-            # Use fallback geometry
-            self._add_fallback_robot(worldbody, robot_id, robot_type, pose)
+                # Find the first body in worldbody (this is the robot)
+                worldbody_elem = robot_root.find(".//worldbody")
+                if worldbody_elem is None:
+                    raise ValueError(f"No worldbody found in {menagerie_name} XML")
+
+                robot_bodies = list(worldbody_elem.findall("body"))
+                if not robot_bodies:
+                    raise ValueError(f"No body elements found in {menagerie_name} worldbody")
+
+                # Take the first body (main robot)
+                robot_body = robot_bodies[0]
+
+                # Update name to use custom robot_id
+                robot_body.set("name", robot_id)
+
+                # Set position and orientation
+                robot_body.set(
+                    "pos", f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}"
+                )
+                robot_body.set(
+                    "quat",
+                    f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
+                )
+
+                # Add to worldbody
+                worldbody.append(robot_body)
+
+                logger.info(f"Added robot {robot_id} from Menagerie model {menagerie_name}")
+                return
+
+            except Exception as e:
+                logger.warning(f"Failed to load {robot_type} from Menagerie: {e}")
+                logger.info("Falling back to simple robot representation")
+
+        # Fallback: use simple geometric representation
+        self._add_fallback_robot(worldbody, robot_id, robot_type, pose)
 
     def _configure_robot_joints(
         self, robot_element: ET.Element, robot_config, metadata: AssetMetadata

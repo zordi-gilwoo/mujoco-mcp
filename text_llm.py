@@ -16,16 +16,18 @@ def _load_scene_generator(model_override: Optional[str]):
 
     from mujoco_mcp.scene_gen.metadata_extractor import MetadataExtractor
     from mujoco_mcp.scene_gen.llm_scene_generator import LLMSceneGenerator
+    from mujoco_mcp.menagerie_loader import MenagerieLoader
 
     extractor = MetadataExtractor()
     generator = LLMSceneGenerator(extractor)
+    menagerie_loader = MenagerieLoader()
 
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY environment variable is not set")
 
     generator.set_provider_config("openai", api_key, model_override)
-    return generator
+    return generator, menagerie_loader
 
 
 def main() -> int:
@@ -39,7 +41,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        generator = _load_scene_generator(args.model)
+        generator, menagerie_loader = _load_scene_generator(args.model)
     except Exception as exc:
         print(f"Failed to set up LLM generator: {exc}")
         return 1
@@ -109,7 +111,7 @@ def main() -> int:
             print()
 
         try:
-            xml_output = scene.to_xml()
+            xml_output = scene.to_xml(menagerie_loader=menagerie_loader)
         except Exception as exc:
             print("Failed to convert structured scene to MuJoCo XML:")
             print(exc)
@@ -134,7 +136,9 @@ def main() -> int:
     return 1
 
 
-def _augment_prompt_with_error(base_prompt: str, error: Exception, structured_json: Optional[dict]) -> str:
+def _augment_prompt_with_error(
+    base_prompt: str, error: Exception, structured_json: Optional[dict]
+) -> str:
     """Create a follow-up prompt that asks the LLM to correct a previous failure."""
 
     message_lines = [

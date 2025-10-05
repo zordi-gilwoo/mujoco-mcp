@@ -723,7 +723,10 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 - shelf_small: Small storage shelf with multiple levels
 
 **Robots:**
-- franka_panda: 7-DOF robotic arm with gripper
+- **franka_panda**: Franka Emika Panda 7-DOF robotic arm with parallel-jaw gripper
+  - Also known as: "Franka Panda", "Panda robot", "Franka Emika"
+  - Use for manipulation tasks, pick-and-place, assembly
+  - Automatically loaded from mujoco_menagerie
 
 ## Available Constraint Types:
 - **on_top_of**: Places subject on top of reference object
@@ -746,7 +749,8 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 4. Colors are optional but must be RGBA values in [0,1] when provided
 5. Anchor large support surfaces without constraints first, then place dependent objects
 6. Use `no_collision` constraints to prevent overlaps when necessary
-7. Return only valid JSON without markdown formatting
+7. **IMPORTANT**: When user mentions robot names (Franka Panda, Panda, etc.), create a robot entry with `robot_type: "franka_panda"`, NOT a primitive object
+8. Return only valid JSON without markdown formatting
 
 ## Example 1 - Cart Pole with Custom Dimensions:
 Input: "Create a cart pole with a 2m long pole"
@@ -903,6 +907,49 @@ Output:
 - Use `on_top_of` to control Z position (vertical placement)
 - Use `beside` or `in_front_of` to control XY position (horizontal placement)
 The constraint solver will compose them correctly - horizontal constraints set XY, vertical constraints set Z.
+
+## Example 4 - Robot with Objects:
+Input: "Place a table with a red cup on it, and put a Franka Panda in front of the table"
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "table",
+      "object_type": "table_standard",
+      "constraints": []
+    },
+    {
+      "object_id": "red_cup",
+      "object_type": "cup_ceramic_small",
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "red_cup",
+          "reference": "table",
+          "clearance": 0.001
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "robot_id": "panda_arm",
+      "robot_type": "franka_panda",
+      "constraints": [
+        {
+          "type": "in_front_of",
+          "subject": "panda_arm",
+          "reference": "table",
+          "clearance": 0.3
+        }
+      ]
+    }
+  ]
+}
+```
+
+**NOTE**: When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
 
 **REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
 

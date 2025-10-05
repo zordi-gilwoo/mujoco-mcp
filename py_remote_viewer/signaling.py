@@ -146,13 +146,17 @@ class SignalingServer:
                 last_error = RuntimeError("Invalid scene description from LLM")
                 if attempt == 3:
                     break
-                current_prompt = self._augment_prompt_with_error(base_prompt, last_error, structured_json)
+                current_prompt = self._augment_prompt_with_error(
+                    base_prompt, last_error, structured_json
+                )
                 continue
 
             try:
-                scene_xml = scene_description.to_xml()
+                scene_xml = scene_description.to_xml(menagerie_loader=self.menagerie_loader)
             except Exception as exc:
-                logger.error("MuJoCo conversion failed on attempt %d: %s", attempt, exc, exc_info=True)
+                logger.error(
+                    "MuJoCo conversion failed on attempt %d: %s", attempt, exc, exc_info=True
+                )
                 last_error = exc
                 if attempt == 3:
                     break

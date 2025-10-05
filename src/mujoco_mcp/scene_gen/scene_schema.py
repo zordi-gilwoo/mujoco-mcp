@@ -224,12 +224,15 @@ class SceneDescription(BaseModel):
 
         return constraints
 
-    def to_xml(self) -> str:
+    def to_xml(self, menagerie_loader=None) -> str:
         """
         Convert this SceneDescription to MuJoCo XML.
 
         This completes the full pipeline:
         NL → SceneDescription → Poses → XML
+
+        Args:
+            menagerie_loader: Optional MenagerieLoader for loading robot models
 
         Returns:
             Complete MuJoCo XML string
@@ -241,7 +244,7 @@ class SceneDescription(BaseModel):
         # Initialize the pipeline components
         metadata_extractor = MetadataExtractor()
         constraint_solver = ConstraintSolver(metadata_extractor)
-        xml_builder = SceneXMLBuilder(metadata_extractor)
+        xml_builder = SceneXMLBuilder(metadata_extractor, menagerie_loader)
 
         # Solve constraints to get poses
         poses = constraint_solver.solve(self)
