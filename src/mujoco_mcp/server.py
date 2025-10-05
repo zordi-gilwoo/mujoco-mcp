@@ -32,13 +32,13 @@ def load_model(model_string: str, name: str | None = None) -> Dict[str, Any]:
         simulations[model_id] = {
             "xml": model_string,
             "name": name or f"Model {len(simulations)}",
-            "created": True
+            "created": True,
         }
         return {
             "status": "success",
             "model_id": model_id,
             "name": simulations[model_id]["name"],
-            "message": f"Model loaded successfully as {model_id}"
+            "message": f"Model loaded successfully as {model_id}",
         }
     except Exception as e:
         logger.exception("Error loading model")
@@ -50,16 +50,14 @@ def get_loaded_models() -> Dict[str, Any]:
     """Get list of all loaded models"""
     models = []
     for model_id, data in simulations.items():
-        models.append({
-            "id": model_id,
-            "name": data.get("name", model_id),
-            "created": data.get("created", False)
-        })
-    return {
-        "status": "success",
-        "count": len(models),
-        "models": models
-    }
+        models.append(
+            {
+                "id": model_id,
+                "name": data.get("name", model_id),
+                "created": data.get("created", False),
+            }
+        )
+    return {"status": "success", "count": len(models), "models": models}
 
 
 @mcp.tool()
@@ -72,7 +70,7 @@ def step_simulation(model_id: str, steps: int = 1) -> Dict[str, Any]:
         "status": "success",
         "model_id": model_id,
         "steps_completed": steps,
-        "message": f"Simulation stepped {steps} times"
+        "message": f"Simulation stepped {steps} times",
     }
 
 
@@ -85,7 +83,7 @@ def reset_simulation(model_id: str) -> Dict[str, Any]:
     return {
         "status": "success",
         "model_id": model_id,
-        "message": "Simulation reset to initial state"
+        "message": "Simulation reset to initial state",
     }
 
 
@@ -100,10 +98,10 @@ def get_server_info() -> Dict[str, Any]:
             "simulation": True,
             "visualization": True,
             "natural_language": True,
-            "model_generation": True
+            "model_generation": True,
         },
         "active_simulations": len(simulations),
-        "mcp_protocol_version": "2025-06-18"
+        "mcp_protocol_version": "2025-06-18",
     }
 
 
@@ -118,6 +116,13 @@ class MuJoCoServer:
         self.name = "mujoco-mcp"
         self.version = __version__
         self.description = "MuJoCo Model Context Protocol Server - A physics simulation server that enables AI agents to control MuJoCo simulations"
+        self._initialized = False
+
+    async def initialize(self) -> None:
+        """Prepare legacy server state for compatibility workflows."""
+        if not self._initialized:
+            logger.info("MuJoCoServer legacy compatibility initialization complete")
+            self._initialized = True
 
     def get_server_info(self) -> Dict[str, Any]:
         """Get server information for MCP compliance"""

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuJoCo Remote Viewer</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>MuJoCo Remote Viewer</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status-disconnected">Disconnected</span>
+                <span id="frame-counter">Frames: 0</span>
+                <span id="event-counter">Events: 0</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="video-panel">
+                <div class="video-container">
+                    <video id="remote-video" autoplay muted playsinline></video>
+                    <div id="video-overlay" class="video-overlay">
+                        <div class="loading-spinner" id="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>Connecting to remote viewer...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="video-controls">
+                    <button id="reset-camera-btn">Reset Camera</button>
+                    <button id="fullscreen-btn">Fullscreen</button>
+                </div>
+            </div>
+
+            <div class="control-panel">
+
+                <!-- API Key Configuration Section -->
+                <div class="panel-section api-key-section">
+                    <div class="api-key-compact">
+                        <span class="api-key-title">🤖 AI Integration</span>
+                        <select id="ai-provider-select" class="provider-dropdown-compact">
+                            <option value="">Provider</option>
+                            <option value="openai">OpenAI (GPT)</option>
+                            <option value="claude">Claude (Anthropic)</option>
+                            <option value="gemini">Gemini (Google)</option>
+                        </select>
+                        <input type="password" id="api-key-input" class="api-key-field-compact" 
+                               placeholder="Enter API key..." 
+                               autocomplete="new-password">
+                        <button id="toggle-api-key-visibility" class="toggle-visibility-btn-compact" type="button">👁️</button>
+                        <button id="save-api-key-btn" class="save-api-key-btn-compact" disabled>Save</button>
+                        <button id="test-ai-btn" class="test-ai-btn-compact" disabled>Test</button>
+                        <span id="api-key-status-indicator" class="status-indicator-compact status-none">❌</span>
+                        <button id="clear-api-key-btn" class="clear-api-key-btn-compact" style="display: none;">Clear</button>
+                    </div>
+                    <div id="ai-integration-status" class="ai-status-text">
+                        No AI provider configured. Add API key to enable scene generation.
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>🤖 Free-Style Commands</h3>
+                    <div class="control-group">
+                        <div class="command-suggestions">
+                            <label>Quick Commands:</label>
+                            <div class="suggestion-buttons">
+                                <button class="suggestion-btn" data-command="Create a pendulum simulation">Pendulum</button>
+                                <button class="suggestion-btn" data-command="Load Franka Panda robot">Franka Panda</button>
+                                <button class="suggestion-btn" data-command="Create a cart pole simulation">Cart Pole</button>
+                                <button class="suggestion-btn" data-command="Step simulation 50 times">Step 50x</button>
+                                <button class="suggestion-btn" data-command="Reset the simulation">Reset</button>
+                                <button class="suggestion-btn" data-command="Show current state">Get State</button>
+                            </div>
+                            <label>RL Commands (requires LLM):</label>
+                            <div class="suggestion-buttons">
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for Franka reaching task" disabled>RL Franka</button>
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for cart pole balancing" disabled>RL Cart Pole</button>
+                                <button class="suggestion-btn rl-btn" data-command="Show RL environment info" disabled>RL Info</button>
+                                <button class="suggestion-btn rl-btn" data-command="Generate RL script for quadruped walking" disabled>RL Script</button>
+                            </div>
+                        </div>
+                        <label for="freestyle-command-input">Custom Natural Language Command (requires LLM API key):</label>
+                        <div class="command-input-container">
+                            <textarea id="freestyle-command-input" class="command-textarea main-input" 
+                                    placeholder="Type custom commands here (requires LLM):&#10;• Create a bouncing ball&#10;• Make a robot reaching for cube&#10;• Build a multi-link pendulum&#10;&#10;For built-in scenes, use Quick Commands above."
+                                    rows="4"></textarea>
+                            <button id="execute-command-btn" class="execute-btn" disabled title="Configure AI API key to execute custom commands. Use Quick Commands for built-in scenes.">Execute Custom Command</button>
+                        </div>
+                        <div id="command-result" class="command-result"></div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Generated Outputs</h3>
+                    
+                    <!-- Scene XML Editor Section -->
+                    <div class="control-group">
+                        <div class="editor-header">
+                            <label>Scene XML:</label>
+                            <button id="toggle-xml-editor" class="toggle-btn">Show XML Editor</button>
+                        </div>
+                        <div id="xml-editor-container" class="editor-container collapsed">
+                            <textarea id="xml-editor" class="code-editor" placeholder="Generated Scene XML will appear here...&#10;You can edit the XML directly and load changes."></textarea>
+                            <div class="editor-actions">
+                                <button id="load-xml-btn" class="save-btn" disabled>Load XML</button>
+                                <button id="export-xml-btn" class="validate-btn" disabled>Export</button>
+                                <button id="menagerie-btn" class="validate-btn" style="background: #4CAF50;" title="View MuJoCo Menagerie models on GitHub">📦 Menagerie</button>
+                                <div id="xml-validation-status" class="validation-status"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RL Script Editor Section -->
+                    <div class="control-group">
+                        <div class="editor-header">
+                            <label>RL Script (Python):</label>
+                            <button id="toggle-rl-editor" class="toggle-btn">Show RL Editor</button>
+                        </div>
+                        <div id="rl-editor-container" class="editor-container collapsed">
+                            <textarea id="rl-editor" class="code-editor" placeholder="Generated RL training script will appear here...&#10;You can edit the Python code directly and save changes."></textarea>
+                            <div class="editor-actions">
+                                <button id="save-rl-btn" class="save-btn" disabled>Save Script</button>
+                                <button id="run-rl-btn" class="run-btn" disabled>Run Script</button>
+                                <div id="rl-validation-status" class="validation-status"></div>
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Simulation Controls</h3>
+                    <div class="control-group">
+                        <div class="button-group">
+                            <button id="start-sim-btn">Play</button>
+                            <button id="pause-sim-btn">Pause</button>
+                            <button id="reset-sim-btn">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-section">
+                    <h3>Event Log</h3>
+                    <div id="event-log" class="event-log">
+                        <p>No events logged yet...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <div class="help-text">
+                <p><strong>Controls:</strong> Left-click + drag to rotate camera, Right-click + drag to pan, Scroll to zoom</p>
+                <p><strong>Keyboard:</strong> Arrow keys to rotate, Page Up/Down to zoom, Space to pause/resume</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

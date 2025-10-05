@@ -49,9 +49,7 @@ def get_viewer_class() -> type:
     try:
         return getattr(module, "MuJoCoViewerServer")
     except AttributeError as exc:  # pragma: no cover - defensive guard
-        raise ImportError(
-            "mujoco_viewer_server does not define MuJoCoViewerServer"
-        ) from exc
+        raise ImportError("mujoco_viewer_server does not define MuJoCoViewerServer") from exc
 
 
 class MuJoCoViewerServer(get_viewer_class()):  # type: ignore[misc]
@@ -78,22 +76,52 @@ def _resolve_script_path() -> Path:
 def main(argv: Optional[list[str]] = None) -> int:
     """CLI entry point that spawns the viewer server in a child process."""
 
-    logging.basicConfig(level=logging.INFO)
-    script_path = _resolve_script_path()
-    cmd = [sys.executable, str(script_path)]
+    import argparse
 
-    try:
-        completed = subprocess.run(cmd, check=True)
-        return completed.returncode
-    except subprocess.CalledProcessError as exc:
-        _LOGGER.exception("Viewer server exited with error")
-        return exc.returncode
-    except KeyboardInterrupt:  # pragma: no cover - interactive convenience
-        _LOGGER.info("Viewer server interrupted by user")
-        return 130
-    except Exception as exc:  # pragma: no cover - defensive
-        _LOGGER.exception("Unexpected viewer server failure: %s", exc)
-        return 1
+    # Parse command line arguments for isolated process mode
+    parser = argparse.ArgumentParser(description="MuJoCo Viewer Server")
+    parser.add_argument("--port", type=int, default=8888, help="Port to bind to")
+    parser.add_argument("--session-id", type=str, help="Session ID for isolation")
+    parser.add_argument("--isolated", action="store_true", help="Run in isolated mode")
+
+    args = parser.parse_args(argv)
+
+    logging.basicConfig(level=logging.INFO)
+
+    if args.isolated and args.session_id:
+        # Run in isolated mode - import and run server directly
+        try:
+            viewer_class = get_viewer_class()
+            server = viewer_class(port=args.port)
+            _LOGGER.info(
+                f"Starting isolated viewer server for session {args.session_id} on port {args.port}"
+            )
+            server.start()
+            return 0
+        except Exception as exc:
+            _LOGGER.exception(f"Isolated viewer server failed: {exc}")
+            return 1
+    else:
+        # Run in child process mode (original behavior)
+        script_path = _resolve_script_path()
+        cmd = [sys.executable, str(script_path)]
+
+        # Pass through arguments
+        if args.port != 8888:
+            cmd.extend(["--port", str(args.port)])
+
+        try:
+            completed = subprocess.run(cmd, check=True)
+            return completed.returncode
+        except subprocess.CalledProcessError as exc:
+            _LOGGER.exception("Viewer server exited with error")
+            return exc.returncode
+        except KeyboardInterrupt:  # pragma: no cover - interactive convenience
+            _LOGGER.info("Viewer server interrupted by user")
+            return 130
+        except Exception as exc:  # pragma: no cover - defensive
+            _LOGGER.exception("Unexpected viewer server failure: %s", exc)
+            return 1
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI shim

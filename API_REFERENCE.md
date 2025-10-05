@@ -16,6 +16,7 @@ This document provides comprehensive API documentation for all MCP tools, Python
 6. [Sensor Feedback API](#sensor-feedback-api)
 7. [RL Integration API](#rl-integration-api)
 8. [Visualization Tools API](#visualization-tools-api)
+9. [WebRTC Viewer API](#webrtc-viewer-api)
 
 ---
 
