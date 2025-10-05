@@ -11,7 +11,7 @@ Phase 2C Enhancement: Now supports symbolic plan generation as an intermediate s
 import json
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 from .scene_schema import SceneDescription
 from .symbolic_plan import SymbolicPlanGenerator, PlanToSceneConverter
@@ -32,7 +32,14 @@ class LLMSceneGenerator:
 
     def __init__(self, metadata_extractor=None):
         # LLM configuration
-        self.llm_enabled = os.getenv("STRUCTURED_SCENE_LLM", "disabled").lower() == "enabled"
+        self.last_structured_json: Optional[Dict[str, Any]] = None
+        self.last_llm_raw_json: Optional[Dict[str, Any]] = None
+        self.last_symbolic_plan: Optional[Dict[str, Any]] = None
+        self.last_llm_prompt: Optional[Dict[str, str]] = None
+        self.last_constraint_fixes: Optional[List[Dict[str, str]]] = None
+        self.last_generation_mode: str = "unknown"
+
+        llm_flag = os.getenv("STRUCTURED_SCENE_LLM", "auto").lower()
 
         # Multi-provider support
         self.provider = os.getenv("LLM_PROVIDER", "openai").lower()
@@ -41,16 +48,21 @@ class LLMSceneGenerator:
         # Provider-specific configuration
         self._setup_provider_config()
 
-        if self.llm_enabled:
-            if self.api_key:
-                logger.info(
-                    f"LLM integration enabled - using {self.provider} with model {self.model}"
-                )
-            else:
-                logger.warning(
-                    f"LLM integration enabled but {self.provider.upper()}_API_KEY not found - will use symbolic plans"
-                )
-                self.llm_enabled = False
+        if llm_flag == "enabled":
+            self.llm_enabled = True
+        elif llm_flag == "disabled":
+            self.llm_enabled = False
+        else:
+            # Auto-enable when an API key is available
+            self.llm_enabled = bool(self.api_key)
+
+        if self.llm_enabled and self.api_key:
+            logger.info(f"LLM integration enabled - using {self.provider} with model {self.model}")
+        elif self.llm_enabled and not self.api_key:
+            logger.warning(
+                f"LLM integration requested but {self.provider.upper()}_API_KEY not found - using symbolic plans"
+            )
+            self.llm_enabled = False
         else:
             logger.info("LLM integration disabled - using symbolic plan generation")
 
@@ -124,6 +136,14 @@ class LLMSceneGenerator:
         Raises:
             ValueError: If no generation method is available
         """
+        # Reset trace metadata
+        self.last_structured_json = None
+        self.last_llm_raw_json = None
+        self.last_symbolic_plan = None
+        self.last_llm_prompt = None
+        self.last_constraint_fixes = []
+        self.last_generation_mode = "unknown"
+
         if self.llm_enabled and self.api_key:
             try:
                 return self._generate_with_llm(prompt)
@@ -142,6 +162,10 @@ class LLMSceneGenerator:
 
         # Step 1: NL → Symbolic Plan
         plan = self.plan_generator.generate_plan_from_nl(prompt)
+        self.last_symbolic_plan = plan.to_dict()
+        self.last_generation_mode = "symbolic"
+        self.last_llm_prompt = None
+        self.last_llm_raw_json = None
 
         # Log plan details for auditability
         logger.info(
@@ -158,6 +182,7 @@ class LLMSceneGenerator:
 
         # Step 2: Plan → Scene Description
         scene = self.plan_converter.convert_plan_to_scene(plan)
+        self.last_structured_json = scene.model_dump()
 
         logger.info(
             f"Converted plan to scene with {len(scene.objects)} objects and {len(scene.robots)} robots"
@@ -181,9 +206,35 @@ class LLMSceneGenerator:
             scene = self.generate_scene_description(prompt)
             return scene.model_dump()
         except Exception as e:
-            logger.error(f"Failed to generate scene from prompt: {e}")
+            logger.exception(f"Failed to generate scene from prompt: {e}")
             # Return fallback canned example
             return self._get_canned_example_dict()
+
+    def generate_scene_with_trace(self, prompt: str) -> Dict[str, Any]:
+        """
+        Generate a scene while capturing trace metadata useful for debugging.
+
+        Returns:
+            Dict containing the SceneDescription plus rich trace artifacts.
+        """
+
+        scene = self.generate_scene_description(prompt)
+
+        trace = {
+            "scene_description": scene,
+            "structured_scene_json": self.last_structured_json or scene.model_dump(),
+            "symbolic_plan": self.last_symbolic_plan,
+            "llm_prompt": self.last_llm_prompt,
+            "llm_raw_json": self.last_llm_raw_json,
+            "constraint_fixes": self.last_constraint_fixes,
+            "generation_mode": self.last_generation_mode,
+        }
+
+        if self.last_generation_mode == "llm":
+            trace["provider"] = self.provider
+            trace["model"] = self.model
+
+        return trace
 
     def _generate_with_llm(self, prompt: str) -> SceneDescription:
         """
@@ -214,17 +265,19 @@ class LLMSceneGenerator:
         try:
             import openai
         except ImportError:
-            logger.error("OpenAI package not installed")
+            logger.exception("OpenAI package not installed")
             raise ImportError(
                 "OpenAI package required for OpenAI integration. Install with: pip install openai"
-            )
+            ) from None
 
         # Initialize OpenAI client
         client = openai.OpenAI(api_key=self.api_key)
 
         # Build structured prompt for scene generation
-        system_prompt = self._get_system_prompt()
-        user_message = self._build_user_message(prompt)
+        prompt_bundle = self.build_llm_prompt(prompt)
+        system_prompt = prompt_bundle["system_prompt"]
+        user_message = prompt_bundle["user_message"]
+        self.last_llm_prompt = prompt_bundle
 
         try:
             logger.info(f"Calling OpenAI API ({self.model}) for scene generation: {prompt[:50]}...")
@@ -246,7 +299,7 @@ class LLMSceneGenerator:
             return self._parse_llm_response(llm_response, prompt)
 
         except Exception as e:
-            logger.error(f"OpenAI API call failed: {e}")
+            logger.exception(f"OpenAI API call failed: {e}")
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(prompt)
 
@@ -255,18 +308,20 @@ class LLMSceneGenerator:
         try:
             import anthropic
         except ImportError:
-            logger.error("Anthropic package not installed")
+            logger.exception("Anthropic package not installed")
             raise ImportError(
                 "Anthropic package required for Claude integration. "
                 "Install with: pip install anthropic"
-            )
+            ) from None
 
         # Initialize Anthropic client
         client = anthropic.Anthropic(api_key=self.api_key)
 
         # Build structured prompt for scene generation
-        system_prompt = self._get_system_prompt()
-        user_message = self._build_user_message(prompt)
+        prompt_bundle = self.build_llm_prompt(prompt)
+        system_prompt = prompt_bundle["system_prompt"]
+        user_message = prompt_bundle["user_message"]
+        self.last_llm_prompt = prompt_bundle
 
         try:
             logger.info(f"Calling Claude API ({self.model}) for scene generation: {prompt[:50]}...")
@@ -286,7 +341,7 @@ class LLMSceneGenerator:
             return self._parse_llm_response(llm_response, prompt)
 
         except Exception as e:
-            logger.error(f"Claude API call failed: {e}")
+            logger.exception(f"Claude API call failed: {e}")
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(prompt)
 
@@ -295,11 +350,11 @@ class LLMSceneGenerator:
         try:
             import google.generativeai as genai
         except ImportError:
-            logger.error("Google GenerativeAI package not installed")
+            logger.exception("Google GenerativeAI package not installed")
             raise ImportError(
                 "Google GenerativeAI package required for Gemini integration. "
                 "Install with: pip install google-generativeai"
-            )
+            ) from None
 
         # Configure Gemini
         genai.configure(api_key=self.api_key)
@@ -308,9 +363,11 @@ class LLMSceneGenerator:
         model = genai.GenerativeModel(self.model)
 
         # Build structured prompt for scene generation
-        system_prompt = self._get_system_prompt()
-        user_message = self._build_user_message(prompt)
-        full_prompt = f"{system_prompt}\n\n{user_message}"
+        prompt_bundle = self.build_llm_prompt(prompt)
+        system_prompt = prompt_bundle["system_prompt"]
+        user_message = prompt_bundle["user_message"]
+        full_prompt = prompt_bundle["combined"]
+        self.last_llm_prompt = prompt_bundle
 
         try:
             logger.info(f"Calling Gemini API ({self.model}) for scene generation: {prompt[:50]}...")
@@ -330,7 +387,7 @@ class LLMSceneGenerator:
             return self._parse_llm_response(llm_response, prompt)
 
         except Exception as e:
-            logger.error(f"Gemini API call failed: {e}")
+            logger.exception(f"Gemini API call failed: {e}")
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(prompt)
 
@@ -340,7 +397,7 @@ class LLMSceneGenerator:
 
 Please generate a complete scene description that fulfills this request. Consider:
 - What objects are needed for the described scenario
-- How objects should be spatially related 
+- How objects should be spatially related
 - Whether robots are needed and how they should be positioned
 - What constraints ensure a realistic, functional layout
 
@@ -358,40 +415,51 @@ Return only the JSON scene description without any additional text or formatting
         try:
             logger.info(f"Parsing LLM response: {llm_response[:500]}...")
             scene_dict = json.loads(llm_response)
+            self.last_llm_raw_json = scene_dict
             logger.info(
                 f"Parsed JSON with objects={len(scene_dict.get('objects', []))}, robots={len(scene_dict.get('robots', []))}"
             )
 
             scene = SceneDescription(**scene_dict)
+            self.last_structured_json = scene.model_dump()
+            self.last_generation_mode = "llm"
             logger.info(
                 f"✓ Successfully validated scene with {len(scene.objects)} objects and {len(scene.robots)} robots"
             )
             return scene
 
         except json.JSONDecodeError as e:
-            logger.error(f"❌ JSON parsing failed: {e}")
-            logger.error(f"Raw LLM response: {llm_response}")
+            logger.exception(f"❌ JSON parsing failed: {e}")
+            logger.exception(f"Raw LLM response: {llm_response}")
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(original_prompt)
 
         except ValueError as e:
-            logger.error(f"❌ Pydantic validation failed: {e}")
-            logger.error(f"Scene dict that failed validation: {json.dumps(scene_dict, indent=2)}")
-            
+            logger.exception(f"❌ Pydantic validation failed: {e}")
+            logger.exception(
+                f"Scene dict that failed validation: {json.dumps(scene_dict, indent=2)}"
+            )
+
             # Try to fix common validation errors (constraint reference issues)
             fixed_scene_dict = self._attempt_fix_constraint_references(scene_dict)
             if fixed_scene_dict:
                 try:
                     scene = SceneDescription(**fixed_scene_dict)
-                    logger.info(f"✓ Fixed constraint references, validated scene with {len(scene.objects)} objects")
+                    self.last_structured_json = scene.model_dump()
+                    self.last_generation_mode = "llm"
+                    logger.info(
+                        f"✓ Fixed constraint references, validated scene with {len(scene.objects)} objects"
+                    )
                     return scene
                 except Exception as fix_error:
-                    logger.error(f"❌ Auto-fix failed: {fix_error}")
-            
+                    logger.exception(f"❌ Auto-fix failed: {fix_error}")
+
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(original_prompt)
 
-    def _attempt_fix_constraint_references(self, scene_dict: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def _attempt_fix_constraint_references(
+        self, scene_dict: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
         """
         Attempt to automatically fix invalid constraint references.
         Common issues: LLM references entity that doesn't exist, or uses similar name.
@@ -399,63 +467,84 @@ Return only the JSON scene description without any additional text or formatting
         try:
             # Collect all valid entity IDs
             valid_ids = set()
-            for obj in scene_dict.get('objects', []):
-                valid_ids.add(obj.get('object_id'))
-            for robot in scene_dict.get('robots', []):
-                valid_ids.add(robot.get('robot_id'))
-            
+            for obj in scene_dict.get("objects", []):
+                valid_ids.add(obj.get("object_id"))
+            for robot in scene_dict.get("robots", []):
+                valid_ids.add(robot.get("robot_id"))
+
             if not valid_ids:
                 return None
-            
+
             logger.info(f"Valid entity IDs: {valid_ids}")
-            
+
             # Check and fix constraint references
             fixed = False
-            
-            for obj in scene_dict.get('objects', []):
-                for constraint in obj.get('constraints', []):
-                    ref = constraint.get('reference')
+            fixes: List[Dict[str, str]] = []
+
+            for obj in scene_dict.get("objects", []):
+                for constraint in obj.get("constraints", []):
+                    ref = constraint.get("reference")
                     if ref and ref not in valid_ids:
                         # Try to find closest match
                         closest = self._find_closest_entity_id(ref, valid_ids)
                         if closest:
                             logger.warning(f"Fixing constraint reference: {ref} → {closest}")
-                            constraint['reference'] = closest
+                            constraint["reference"] = closest
                             fixed = True
-            
-            for robot in scene_dict.get('robots', []):
-                for constraint in robot.get('constraints', []):
-                    ref = constraint.get('reference')
+                            fixes.append(
+                                {
+                                    "entity": constraint.get("subject", "unknown"),
+                                    "original_reference": ref,
+                                    "replacement_reference": closest,
+                                }
+                            )
+
+            for robot in scene_dict.get("robots", []):
+                for constraint in robot.get("constraints", []):
+                    ref = constraint.get("reference")
                     if ref and ref not in valid_ids:
                         closest = self._find_closest_entity_id(ref, valid_ids)
                         if closest:
                             logger.warning(f"Fixing constraint reference: {ref} → {closest}")
-                            constraint['reference'] = closest
+                            constraint["reference"] = closest
                             fixed = True
-            
-            return scene_dict if fixed else None
-            
-        except Exception as e:
-            logger.error(f"Error attempting to fix constraints: {e}")
+                            fixes.append(
+                                {
+                                    "entity": constraint.get(
+                                        "subject", robot.get("robot_id", "unknown")
+                                    ),
+                                    "original_reference": ref,
+                                    "replacement_reference": closest,
+                                }
+                            )
+
+            if fixed:
+                self.last_constraint_fixes = fixes
+                return scene_dict
+
             return None
-    
+
+        except Exception as e:
+            logger.exception(f"Error attempting to fix constraints: {e}")
+            return None
+
     def _find_closest_entity_id(self, invalid_ref: str, valid_ids: set) -> Optional[str]:
         """Find closest matching entity ID using simple string similarity."""
         if not valid_ids:
             return None
-        
+
         # Simple matching: check if invalid_ref is substring of any valid ID, or vice versa
         invalid_lower = invalid_ref.lower()
-        
+
         for valid_id in valid_ids:
             valid_lower = valid_id.lower()
             # Check if either is substring of the other
             if invalid_lower in valid_lower or valid_lower in invalid_lower:
                 return valid_id
-        
+
         # Fallback: return any ID (first one)
         return list(valid_ids)[0]
-    
+
     def _generate_canned_example(self, prompt: str) -> SceneDescription:
         """Generate a canned example scene based on prompt keywords."""
         # Analyze prompt for keywords to select appropriate example
@@ -598,15 +687,10 @@ Your task is to convert natural language descriptions into valid JSON scene desc
   "objects": [
     {
       "object_id": "unique_identifier",
-      "object_type": "type_from_available_assets",
-      "constraints": [
-        {
-          "type": "constraint_type",
-          "subject": "this_object_id", 
-          "reference": "target_object_id",
-          "clearance": 0.01
-        }
-      ],
+      "object_type": "type_from_available_assets_or_primitives",
+      "dimensions": {"width": 0.5, "height": 2.0},  // REQUIRED for primitives, optional otherwise
+      "color": [0.8, 0.2, 0.2, 1.0],  // optional RGBA values in [0,1]
+      "constraints": [...],
       "orientation": [x, y, z, w]  // optional quaternion
     }
   ],
@@ -617,18 +701,23 @@ Your task is to convert natural language descriptions into valid JSON scene desc
       "base_position": [x, y, z],  // optional, auto-positioned if omitted
       "base_orientation": [x, y, z, w],  // optional quaternion
       "joint_config": "config_name",
-      "constraints": [
-        // same constraint format as objects
-      ]
+      "constraints": [ ... ]
     }
   ],
   "workspace_bounds": [x_min, y_min, z_min, x_max, y_max, z_max]  // optional
 }
 ```
 
-## Available Assets:
+## Available Primitive Types (use for custom-sized geometry):
+- **primitive:box** - requires `width`, `depth`, `height` (meters)
+- **primitive:sphere** - requires `radius` (meters)
+- **primitive:cylinder** - requires `radius`, `height` (meters)
+- **primitive:capsule** - requires `radius`, `length` (meters, length excludes hemispherical caps)
+- **primitive:ellipsoid** - requires `radius_x`, `radius_y`, `radius_z` (meters)
+
+## Available Predefined Assets:
 **Objects:**
-- table_standard: Standard work table (0.8m x 1.2m x 0.05m)
+- table_standard: Standard work table (0.8m x 1.2m x 0.75m)
 - cup_ceramic_small: Small ceramic cup (0.08m diameter, 0.1m height)
 - box_small: Small cardboard box (0.1m x 0.1m x 0.1m)
 - shelf_small: Small storage shelf with multiple levels
@@ -639,89 +728,52 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 ## Available Constraint Types:
 - **on_top_of**: Places subject on top of reference object
 - **in_front_of**: Places subject in front (+X direction) of reference
-- **beside**: Places subject beside (+Y direction) of reference  
+- **beside**: Places subject beside (+Y direction) of reference
 - **no_collision**: Ensures minimum clearance between objects
 - **within_reach**: Places subject within robot's reachable workspace
-- **inside**: Places subject inside a container (like shelf)
+- **inside**: Places subject inside a container
 - **aligned_with_axis**: Aligns subject along specified axis
-
-## Available Joint Configurations:
-- **ready**: Robot arm in ready position for manipulation
-- **home**: Robot arm in home/neutral position
-- **tucked**: Robot arm tucked against body
 
 ## CRITICAL VALIDATION RULES:
 1. **Every constraint.reference MUST be an object_id or robot_id that exists in the scene**
 2. **Every constraint.subject MUST match the object_id of the object it belongs to**
-3. **Do NOT reference non-existent entities** (e.g., if you create "cart_pole", don't reference "cart_top")
+3. **Do NOT reference non-existent entities** (e.g., if you create "cart_pole", do not reference "cart_top")
 
 ## Guidelines:
 1. Use descriptive, unique IDs for objects and robots
 2. Always specify clearance values (typically 0.001-0.05m)
-3. Place tables first (no constraints), then objects on tables
-4. Position robots with appropriate clearance from work surfaces
-5. Use no_collision constraints to prevent overlapping objects
-6. Consider workspace_bounds for complex scenes (default: [-2, -2, 0, 2, 2, 2])
+3. Use primitive types whenever custom dimensions are required and always provide the required dimension keys
+4. Colors are optional but must be RGBA values in [0,1] when provided
+5. Anchor large support surfaces without constraints first, then place dependent objects
+6. Use `no_collision` constraints to prevent overlaps when necessary
 7. Return only valid JSON without markdown formatting
-8. **IMPORTANT**: constraint references must match actual entity IDs in your scene
 
-## Example 1:
-Input: "Create a workspace with a table, cup on the table, and robot arm nearby"
-Output:
-```json
-{
-  "objects": [
-    {
-      "object_id": "work_table",
-      "object_type": "table_standard",
-      "constraints": []
-    },
-    {
-      "object_id": "coffee_cup",
-      "object_type": "cup_ceramic_small",
-      "constraints": [
-        {
-          "type": "on_top_of",
-          "subject": "coffee_cup",
-          "reference": "work_table",
-          "clearance": 0.002
-        }
-      ]
-    }
-  ],
-  "robots": [
-    {
-      "robot_id": "manipulator_arm",
-      "robot_type": "franka_panda",
-      "joint_config": "ready",
-      "constraints": [
-        {
-          "type": "in_front_of",
-          "subject": "manipulator_arm",
-          "reference": "work_table",
-          "clearance": 0.2
-        }
-      ]
-    }
-  ]
-}
-```
-
-## Example 2 - Custom Objects:
-For custom objects not in the asset database, you can still create them:
-Input: "Create a cart pole with a long pole"
+## Example 1 - Cart Pole with Custom Dimensions:
+Input: "Create a cart pole with a 2m long pole"
 Output:
 ```json
 {
   "objects": [
     {
       "object_id": "cart",
-      "object_type": "box_small",
+      "object_type": "primitive:box",
+      "dimensions": {
+        "width": 0.4,
+        "depth": 0.3,
+        "height": 0.2
+      },
+      "color": [0.3, 0.3, 0.3, 1.0],
       "constraints": []
     },
     {
       "object_id": "pole",
-      "object_type": "box_small",
+      "object_type": "primitive:cylinder",
+      "dimensions": {
+        "radius": 0.02,
+        "height": 2.0
+      },
+      "color": [0.8, 0.2, 0.2, 1.0],
+      "orientation": [0.707, 0.0, 0.0, 0.707],
       "constraints": [
         {
           "type": "on_top_of",
@@ -736,28 +788,49 @@ Output:
 }
 ```
 
-**IMPORTANT**: Notice in Example 2 that constraints reference "cart" and "pole" - these MUST match the object_id fields exactly. Never reference an entity that isn't defined!
+## Example 2 - Ball on Table:
+Input: "Place a red ball on a table"
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "table",
+      "object_type": "table_standard",
+      "constraints": []
+    },
+    {
+      "object_id": "ball",
+      "object_type": "primitive:sphere",
+      "dimensions": {
+        "radius": 0.1
+      },
+      "color": [1.0, 0.0, 0.0, 1.0],
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "ball",
+          "reference": "table",
+          "clearance": 0.001
+        }
+      ]
+    }
+  ],
+  "robots": []
+}
+```
 
-Generate realistic, physically plausible scenes. Respond with valid JSON only."""
+**REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
 
-    def build_llm_prompt(self, user_prompt: str) -> str:
-        """
-        Build a structured prompt for LLM scene generation.
-
-        This method constructs the full conversation for the LLM API call.
-        """
+    def build_llm_prompt(self, user_prompt: str) -> Dict[str, str]:
+        """Return a structured prompt bundle for LLM scene generation."""
         system_prompt = self._get_system_prompt()
 
-        # Add context about the specific request
-        context_prompt = f"""
-Natural Language Request: "{user_prompt}"
+        context_prompt = self._build_user_message(user_prompt)
 
-Please generate a complete scene description that fulfills this request. Consider:
-- What objects are needed for the described scenario
-- How objects should be spatially related 
-- Whether robots are needed and how they should be positioned
-- What constraints ensure a realistic, functional layout
-
-Return only the JSON scene description without any additional text or formatting."""
-
-        return system_prompt + context_prompt
+        return {
+            "system_prompt": system_prompt,
+            "user_message": context_prompt,
+            "combined": f"{system_prompt}\n\n{context_prompt}",
+            "natural_language_request": user_prompt,
+        }

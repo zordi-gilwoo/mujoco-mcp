@@ -6,7 +6,7 @@ Pydantic models for structured scene descriptions, including objects,
 robots, spatial constraints, and validation rules.
 """
 
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field, field_validator, model_validator
 import logging
 
@@ -33,6 +33,7 @@ class SpatialConstraint(BaseModel):
     )
 
     @field_validator("type")
+    @classmethod
     def validate_constraint_type(cls, v):
         # Phase 2B: Extended constraint types for advanced spatial reasoning
         allowed_types = [
@@ -63,12 +64,50 @@ class ObjectPlacement(BaseModel):
     orientation: Optional[Tuple[float, float, float, float]] = Field(
         default=None, description="Quaternion orientation [x, y, z, w]. Default is [0, 0, 0, 1]"
     )
+    dimensions: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Custom dimensions in meters (e.g., {'width': 0.5, 'height': 2.0})",
+    )
+    color: Optional[Tuple[float, float, float, float]] = Field(
+        default=None,
+        description="RGBA color values in [0,1] for MuJoCo geoms (e.g., (0.8, 0.2, 0.2, 1.0))",
+    )
 
     @field_validator("object_id")
+    @classmethod
     def validate_object_id(cls, v):
         if not v or not v.strip():
             raise ValueError("Object ID cannot be empty")
         return v
+
+    @model_validator(mode="after")
+    def validate_primitive_dimensions(self):
+        """Ensure primitive objects receive the required dimension keys."""
+        object_type = self.object_type or ""
+        if not object_type.startswith("primitive:"):
+            return self
+
+        primitive_type = object_type.split(":", 1)[1]
+
+        if not self.dimensions:
+            raise ValueError(f"Primitive type {object_type} requires dimensions")
+
+        required_keys = {
+            "box": {"width", "depth", "height"},
+            "sphere": {"radius"},
+            "cylinder": {"radius", "height"},
+            "capsule": {"radius", "length"},
+            "ellipsoid": {"radius_x", "radius_y", "radius_z"},
+        }
+
+        if primitive_type in required_keys:
+            missing = required_keys[primitive_type] - set(self.dimensions.keys())
+            if missing:
+                raise ValueError(
+                    f"Primitive {primitive_type} missing dimensions: {sorted(missing)}"
+                )
+
+        return self
 
 
 class RobotConfiguration(BaseModel):
@@ -195,6 +234,4 @@ class SceneDescription(BaseModel):
         poses = constraint_solver.solve(self)
 
         # Build XML from poses
-        xml = xml_builder.build_scene(self, poses)
-
-        return xml
+        return xml_builder.build_scene(self, poses)

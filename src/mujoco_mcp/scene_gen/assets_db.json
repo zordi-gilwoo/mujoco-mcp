@@ -1,7 +1,108 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "description": "Asset database for structured scene generation",
   "assets": {
+    "primitive:box": {
+      "type": "primitive",
+      "primitive_shape": "box",
+      "description": "Parametric box with custom dimensions",
+      "required_dimensions": ["width", "depth", "height"],
+      "default_dimensions": {
+        "width": 0.1,
+        "depth": 0.1,
+        "height": 0.1
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.05],
+        "bottom_surface": [0, 0, -0.05],
+        "center": [0, 0, 0.0]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, -0.05],
+        "max": [0.05, 0.05, 0.05]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"box\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+    },
+    "primitive:sphere": {
+      "type": "primitive",
+      "primitive_shape": "sphere",
+      "description": "Parametric sphere with custom radius",
+      "required_dimensions": ["radius"],
+      "default_dimensions": {
+        "radius": 0.05
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.05],
+        "bottom_surface": [0, 0, -0.05],
+        "center": [0, 0, 0.0]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, -0.05],
+        "max": [0.05, 0.05, 0.05]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"sphere\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+    },
+    "primitive:cylinder": {
+      "type": "primitive",
+      "primitive_shape": "cylinder",
+      "description": "Parametric cylinder with custom radius and height",
+      "required_dimensions": ["radius", "height"],
+      "default_dimensions": {
+        "radius": 0.05,
+        "height": 0.1
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.05],
+        "bottom_surface": [0, 0, -0.05],
+        "center": [0, 0, 0.0]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, -0.05],
+        "max": [0.05, 0.05, 0.05]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"cylinder\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+    },
+    "primitive:capsule": {
+      "type": "primitive",
+      "primitive_shape": "capsule",
+      "description": "Parametric capsule with custom radius and length",
+      "required_dimensions": ["radius", "length"],
+      "default_dimensions": {
+        "radius": 0.05,
+        "length": 0.1
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.1],
+        "bottom_surface": [0, 0, -0.1],
+        "center": [0, 0, 0.0]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, -0.1],
+        "max": [0.05, 0.05, 0.1]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"capsule\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+    },
+    "primitive:ellipsoid": {
+      "type": "primitive",
+      "primitive_shape": "ellipsoid",
+      "description": "Parametric ellipsoid with custom radii",
+      "required_dimensions": ["radius_x", "radius_y", "radius_z"],
+      "default_dimensions": {
+        "radius_x": 0.05,
+        "radius_y": 0.05,
+        "radius_z": 0.05
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.05],
+        "bottom_surface": [0, 0, -0.05],
+        "center": [0, 0, 0.0]
+      },
+      "bounding_box": {
+        "min": [-0.05, -0.05, -0.05],
+        "max": [0.05, 0.05, 0.05]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"ellipsoid\" size=\"{size}\" rgba=\"{rgba}\"/></body>"
+    },
     "table_standard": {
       "type": "table",
       "description": "Standard rectangular table",
@@ -20,6 +121,26 @@
         "max": [0.6, 0.4, 0.75]
       },
       "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_top\" type=\"box\" size=\"0.6 0.4 0.02\" pos=\"0 0 0.73\" rgba=\"0.8 0.6 0.4 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/><geom name=\"{name}_legs\" type=\"box\" size=\"0.05 0.05 0.36\" pos=\"-0.5 -0.3 0.36\" rgba=\"0.6 0.4 0.2 1\"/></body>"
+    },
+    "shelf_small": {
+      "type": "storage",
+      "description": "Compact shelf unit with two levels",
+      "default_dimensions": {
+        "width": 0.6,
+        "depth": 0.3,
+        "height": 0.9
+      },
+      "semantic_points": {
+        "top_surface": [0, 0, 0.9],
+        "middle_shelf": [0, 0, 0.45],
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.45]
+      },
+      "bounding_box": {
+        "min": [-0.3, -0.15, 0],
+        "max": [0.3, 0.15, 0.9]
+      },
+      "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_frame\" type=\"box\" size=\"0.3 0.15 0.02\" pos=\"0 0 0.88\" rgba=\"0.7 0.7 0.7 1\"/><geom name=\"{name}_shelf_mid\" type=\"box\" size=\"0.3 0.15 0.015\" pos=\"0 0 0.45\" rgba=\"0.8 0.8 0.8 1\"/><geom name=\"{name}_bottom\" type=\"box\" size=\"0.3 0.15 0.02\" pos=\"0 0 0.02\" rgba=\"0.6 0.6 0.6 1\"/><geom name=\"{name}_leg1\" type=\"box\" size=\"0.02 0.02 0.45\" pos=\"0.26 0.11 0.45\" rgba=\"0.4 0.4 0.4 1\"/><geom name=\"{name}_leg2\" type=\"box\" size=\"0.02 0.02 0.45\" pos=\"-0.26 0.11 0.45\" rgba=\"0.4 0.4 0.4 1\"/><geom name=\"{name}_leg3\" type=\"box\" size=\"0.02 0.02 0.45\" pos=\"0.26 -0.11 0.45\" rgba=\"0.4 0.4 0.4 1\"/><geom name=\"{name}_leg4\" type=\"box\" size=\"0.02 0.02 0.45\" pos=\"-0.26 -0.11 0.45\" rgba=\"0.4 0.4 0.4 1\"/></body>"
     },
     "cup_ceramic_small": {
       "type": "cup",
