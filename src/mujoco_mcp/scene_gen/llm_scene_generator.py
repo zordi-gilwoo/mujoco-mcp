@@ -1030,12 +1030,53 @@ Output:
 - ALWAYS extract and use numbers from user's request!
 
 **CRITICAL SPATIAL PLACEMENT**:
+- "on X" / "on top of X" → use `on_top_of` constraint (works for robots too!)
 - "to the left of X" → beside X with negative X offset (e.g., `offset: [-1.1, 0, 0]`)
 - "to the right of X" → beside X with positive X offset (e.g., `offset: [1.1, 0, 0]`)
+- "next to X" / "beside X" → use `beside` constraint (default +Y direction)
+- "in front of X" → use `in_front_of` constraint (+X direction)
+- "behind X" / "back of X" → use `in_front_of` with negative clearance
 - "opposite side of X" → beside X with large positive offset to go around
-- Use offset field to control exact X position relative to reference
+- Use offset field for precise X/Y positioning relative to reference
 
-**NOTE**: When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
+**ROBOTS ON SURFACES**: When user says "robot on the table", robots CAN use `on_top_of` constraint just like objects!
+
+## Example 6 - Robot ON Surface (Critical Pattern):
+Input: "Put a table next to a shelf. Place Kinova Gen3 robot on the table."
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "shelf",
+      "object_type": "composite:shelf",
+      "dimensions": {"width": 0.6, "depth": 0.3, "height": 0.9, "num_shelves": 2},
+      "constraints": []
+    },
+    {
+      "object_id": "table",
+      "object_type": "table_standard",
+      "constraints": [
+        {"type": "beside", "subject": "table", "reference": "shelf", "clearance": 0.3}
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "robot_id": "kinova_robot",
+      "robot_type": "kinova_gen3",
+      "constraints": [
+        {"type": "on_top_of", "subject": "kinova_robot", "reference": "table", "clearance": 0.001}
+      ]
+    }
+  ]
+}
+```
+
+**NOTE**: 
+- "robot ON table" → use `on_top_of` constraint (not beside/in_front_of!)
+- When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
+- When user mentions "Kinova Gen3", "Gen3", use `robot_type: "kinova_gen3"`.
 
 **REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
         )
