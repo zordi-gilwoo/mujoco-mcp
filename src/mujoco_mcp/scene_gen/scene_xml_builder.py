@@ -403,7 +403,7 @@ class SceneXMLBuilder:
         return max(density * volume, 1e-6)
 
     def _add_robot_to_worldbody(self, worldbody: ET.Element, robot_config, pose: Pose):
-        """Add a robot to the worldbody using Menagerie model."""
+        """Add a robot to the worldbody using file include."""
         robot_id = robot_config.robot_id
         robot_type = robot_config.robot_type
 
@@ -413,28 +413,12 @@ class SceneXMLBuilder:
             menagerie_name = self._robot_model_mapping.get(robot_type, robot_type)
 
             try:
-                # Get the robot XML from Menagerie
-                robot_xml = self.menagerie_loader.get_model_xml(menagerie_name)
+                # Get the path to the robot XML file from Menagerie
+                robot_file = self.menagerie_loader.get_model_file(menagerie_name)
 
-                # Parse the Menagerie XML to extract the robot body
-                robot_root = ET.fromstring(robot_xml)
-
-                # Find the first body in worldbody (this is the robot)
-                worldbody_elem = robot_root.find(".//worldbody")
-                if worldbody_elem is None:
-                    raise ValueError(f"No worldbody found in {menagerie_name} XML")
-
-                robot_bodies = list(worldbody_elem.findall("body"))
-                if not robot_bodies:
-                    raise ValueError(f"No body elements found in {menagerie_name} worldbody")
-
-                # Take the first body (main robot)
-                robot_body = robot_bodies[0]
-
-                # Update name to use custom robot_id
-                robot_body.set("name", robot_id)
-
-                # Set position and orientation
+                # Create a body wrapper with position/orientation and include the robot
+                robot_body = ET.SubElement(worldbody, "body")
+                robot_body.set("name", f"{robot_id}_base")
                 robot_body.set(
                     "pos", f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}"
                 )
@@ -443,10 +427,11 @@ class SceneXMLBuilder:
                     f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
                 )
 
-                # Add to worldbody
-                worldbody.append(robot_body)
+                # Add include element pointing to the robot file
+                include = ET.SubElement(robot_body, "include")
+                include.set("file", str(robot_file))
 
-                logger.info(f"Added robot {robot_id} from Menagerie model {menagerie_name}")
+                logger.info(f"Added robot {robot_id} from Menagerie via include: {robot_file}")
                 return
 
             except Exception as e:
