@@ -349,16 +349,23 @@ Return only the JSON scene description without any additional text or formatting
         
         # Parse JSON response
         try:
+            logger.info(f"Parsing LLM response: {llm_response[:500]}...")
             scene_dict = json.loads(llm_response)
+            logger.info(f"Parsed JSON with objects={len(scene_dict.get('objects', []))}, robots={len(scene_dict.get('robots', []))}")
+            
             scene = SceneDescription(**scene_dict)
-            logger.info(f"Successfully generated scene with {len(scene.objects)} objects and {len(scene.robots)} robots")
+            logger.info(f"✓ Successfully validated scene with {len(scene.objects)} objects and {len(scene.robots)} robots")
             return scene
             
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.error(f"Failed to parse LLM response as valid scene: {e}")
-            logger.debug(f"Raw LLM response: {llm_response}")
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ JSON parsing failed: {e}")
+            logger.error(f"Raw LLM response: {llm_response}")
+            logger.info("Falling back to symbolic plan generation")
+            return self._generate_with_symbolic_plan(original_prompt)
             
-            # Fallback to symbolic plan generation
+        except ValueError as e:
+            logger.error(f"❌ Pydantic validation failed: {e}")
+            logger.error(f"Scene dict that failed validation: {json.dumps(scene_dict, indent=2)}")
             logger.info("Falling back to symbolic plan generation")
             return self._generate_with_symbolic_plan(original_prompt)
     
