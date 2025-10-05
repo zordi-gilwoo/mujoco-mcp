@@ -144,3 +144,7 @@ MUJOCO_LOG.TXT
 /data/
 /models/downloaded/
 /output/
+
+# Test reports and artifacts
+*_report.json
+bandit_results.json
