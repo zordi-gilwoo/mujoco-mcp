@@ -193,8 +193,8 @@ class RemoteViewer {
                 if (e.target.disabled) return;
                 
                 const command = e.target.dataset.command;
-                // Execute directly without enabling the Execute button
-                this.executeFreestyleCommand.call(this, command);
+                // Execute directly, forcing built-in command path (not LLM)
+                this.executeBuiltinCommand(command);
             });
         });
         
@@ -1625,11 +1625,51 @@ if __name__ == "__main__":
     }
     
     /**
-     * Execute free-style natural language command
-     * @param {string} directCommand - Optional command to execute directly (from quick buttons)
+     * Execute built-in command (from quick buttons)
+     * Always uses keyword matching, never LLM
      */
-    async executeFreestyleCommand(directCommand = null) {
-        const command = directCommand || this.elements.freestyleCommandInput.value.trim();
+    async executeBuiltinCommand(command) {
+        if (!command) return;
+        
+        this.showCommandResult('loading', 'Executing command...');
+        this.logEvent('Command', `Executing built-in: "${command}"`);
+        
+        try {
+            // Always use regular MCP server execution (keyword matching)
+            const response = await fetch('/api/execute-command', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    command: command
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.showCommandResult('success', result.result || result.message);
+                this.logEvent('Command', '✓ Built-in command executed successfully');
+                
+                // Update XML editor with the newly loaded scene
+                await this.loadCurrentSceneXML();
+            } else {
+                throw new Error(result.error || result.message || 'Command execution failed');
+            }
+            
+        } catch (error) {
+            this.showCommandResult('error', `Error: ${error.message}`);
+            this.logEvent('Error', `Command failed: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Execute free-style natural language command (from text box)
+     * Uses LLM for custom scene generation if configured
+     */
+    async executeFreestyleCommand() {
+        const command = this.elements.freestyleCommandInput.value.trim();
         if (!command) return;
         
         this.elements.executeCommandBtn.disabled = true;
