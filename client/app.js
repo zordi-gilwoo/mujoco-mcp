@@ -192,6 +192,9 @@ class RemoteViewer {
         
         this.elements.suggestionBtns.forEach(btn => {
             btn.addEventListener('click', (e) => {
+                // Don't execute if button is disabled
+                if (e.target.disabled) return;
+                
                 const command = e.target.dataset.command;
                 this.elements.freestyleCommandInput.value = command;
                 this.handleFreestyleInputChange();
@@ -1611,6 +1614,7 @@ if __name__ == "__main__":
      */
     handleFreestyleInputChange() {
         const command = this.elements.freestyleCommandInput.value.trim();
+        // Always enable if there's a command - built-in commands work without LLM
         this.elements.executeCommandBtn.disabled = !command;
     }
     
@@ -2369,6 +2373,14 @@ if __name__ == "__main__":
         const clearBtn = this.elements.clearApiKeyBtn;
         const testBtn = this.elements.testAiBtn;
         
+        // Enable/disable RL command buttons based on API key
+        this.elements.suggestionBtns.forEach(btn => {
+            if (btn.classList.contains('rl-btn')) {
+                btn.disabled = !isConfigured;
+                btn.title = isConfigured ? '' : 'Configure AI API key to enable RL commands';
+            }
+        });
+        
         if (isConfigured) {
             indicator.className = 'status-indicator-compact status-configured';
             indicator.textContent = '✅';
@@ -2380,7 +2392,7 @@ if __name__ == "__main__":
             }
             
             if (this.elements.aiIntegrationStatus) {
-                this.elements.aiIntegrationStatus.textContent = `${provider.toUpperCase()} API key configured. Ready for scene generation!`;
+                this.elements.aiIntegrationStatus.textContent = `${provider.toUpperCase()} API key configured. Custom scene generation enabled!`;
             }
         } else {
             indicator.className = 'status-indicator-compact status-none';
@@ -2393,7 +2405,7 @@ if __name__ == "__main__":
             }
             
             if (this.elements.aiIntegrationStatus) {
-                this.elements.aiIntegrationStatus.textContent = 'No AI provider configured. Add API key to enable scene generation.';
+                this.elements.aiIntegrationStatus.textContent = 'No AI provider configured. Built-in commands work, but custom scene generation unavailable.';
             }
         }
     }

@@ -64,13 +64,6 @@
                 <div class="panel-section">
                     <h3>🤖 Free-Style Commands</h3>
                     <div class="control-group">
-                        <label for="freestyle-command-input">Natural Language Command:</label>
-                        <div class="command-input-container">
-                            <textarea id="freestyle-command-input" class="command-textarea main-input" 
-                                    placeholder="Type any command in natural language...&#10;&#10;Examples:&#10;• Create a pendulum simulation&#10;• Load Franka Panda robot&#10;• Step simulation 100 times&#10;• Create RL training for Franka reaching task&#10;• Show RL environment info&#10;• Generate scene XML&#10;• Create RL script for quadruped walking"
-                                    rows="5"></textarea>
-                            <button id="execute-command-btn" class="execute-btn">Execute Command</button>
-                        </div>
                         <div class="command-suggestions">
                             <label>Quick Commands:</label>
                             <div class="suggestion-buttons">
@@ -81,13 +74,20 @@
                                 <button class="suggestion-btn" data-command="Reset the simulation">Reset</button>
                                 <button class="suggestion-btn" data-command="Show current state">Get State</button>
                             </div>
-                            <label>RL Commands:</label>
+                            <label>RL Commands (requires LLM):</label>
                             <div class="suggestion-buttons">
-                                <button class="suggestion-btn rl-btn" data-command="Create RL training for Franka reaching task">RL Franka</button>
-                                <button class="suggestion-btn rl-btn" data-command="Create RL training for cart pole balancing">RL Cart Pole</button>
-                                <button class="suggestion-btn rl-btn" data-command="Show RL environment info">RL Info</button>
-                                <button class="suggestion-btn rl-btn" data-command="Generate RL script for quadruped walking">RL Script</button>
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for Franka reaching task" disabled>RL Franka</button>
+                                <button class="suggestion-btn rl-btn" data-command="Create RL training for cart pole balancing" disabled>RL Cart Pole</button>
+                                <button class="suggestion-btn rl-btn" data-command="Show RL environment info" disabled>RL Info</button>
+                                <button class="suggestion-btn rl-btn" data-command="Generate RL script for quadruped walking" disabled>RL Script</button>
                             </div>
+                        </div>
+                        <label for="freestyle-command-input">Natural Language Command (LLM required for custom scenes):</label>
+                        <div class="command-input-container">
+                            <textarea id="freestyle-command-input" class="command-textarea main-input" 
+                                    placeholder="Built-in commands (always work):&#10;• Create a pendulum simulation&#10;• Load Franka Panda robot&#10;• Step simulation 50 times&#10;&#10;Custom commands (require LLM API key):&#10;• Create a bouncing ball&#10;• Make a robot reaching for cube"
+                                    rows="5"></textarea>
+                            <button id="execute-command-btn" class="execute-btn">Execute Command</button>
                         </div>
                         <div id="command-result" class="command-result"></div>
                     </div>

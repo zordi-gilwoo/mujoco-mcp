@@ -218,9 +218,7 @@ class MuJoCoSimulation:
         if self.data is None or self.model is None or self.model.nq <= 0:
             return
 
-        if np.allclose(self.data.qpos, self.model.qpos0) and np.allclose(
-            self.data.qvel, 0
-        ):
+        if np.allclose(self.data.qpos, self.model.qpos0) and np.allclose(self.data.qvel, 0):
             perturb = np.zeros(self.model.nq)
 
             # Collect joints to potentially kick
