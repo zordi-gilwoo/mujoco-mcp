@@ -205,15 +205,32 @@ class SceneXMLBuilder:
             if not robot_bodies:
                 raise ValueError(f"No robot body found in {model_dir} worldbody")
 
-            # Update the robot's base body with desired position
-            base_body = robot_bodies[0]
-            base_body.set(
+            # Extract the robot's internal structure (e.g., "base_link")
+            robot_internal_body = robot_bodies[0]
+            
+            # Remove it from the robot's worldbody
+            worldbody.remove(robot_internal_body)
+            
+            # Create a wrapper body with the robot_id as name
+            wrapper_body = ET.Element("body")
+            wrapper_body.set("name", robot_id)
+            wrapper_body.set(
                 "pos", f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}"
             )
-            base_body.set(
+            wrapper_body.set(
                 "quat",
                 f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
             )
+            
+            # Reset robot's internal body to local origin (relative to wrapper)
+            robot_internal_body.set("pos", "0 0 0")
+            robot_internal_body.set("quat", "0 0 0 1")
+            
+            # Add robot's internal structure as child of wrapper
+            wrapper_body.append(robot_internal_body)
+            
+            # Add wrapper back to robot's worldbody
+            worldbody.append(wrapper_body)
 
             logger.info(f"Loaded positioned robot {robot_id} at {pose.position}")
             return robot_root
