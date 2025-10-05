@@ -196,9 +196,8 @@ class RemoteViewer {
                 if (e.target.disabled) return;
                 
                 const command = e.target.dataset.command;
-                this.elements.freestyleCommandInput.value = command;
-                this.handleFreestyleInputChange();
-                this.executeFreestyleCommand();
+                // Execute directly without enabling the Execute button
+                this.executeFreestyleCommand.call(this, command);
             });
         });
         
@@ -1614,15 +1613,31 @@ if __name__ == "__main__":
      */
     handleFreestyleInputChange() {
         const command = this.elements.freestyleCommandInput.value.trim();
-        // Always enable if there's a command - built-in commands work without LLM
-        this.elements.executeCommandBtn.disabled = !command;
+        
+        // Only enable Execute button for custom commands (requires manual typing)
+        // Quick command buttons execute directly without this button
+        const apiKeyConfig = this.getApiKeyConfiguration();
+        const hasApiKey = apiKeyConfig.provider && apiKeyConfig.apiKey;
+        
+        // Disable button if no text OR if no API key (custom commands need LLM)
+        this.elements.executeCommandBtn.disabled = !command || !hasApiKey;
+        
+        // Update button tooltip
+        if (!command) {
+            this.elements.executeCommandBtn.title = 'Type a custom command first';
+        } else if (!hasApiKey) {
+            this.elements.executeCommandBtn.title = 'Configure AI API key to execute custom commands. Use Quick Commands for built-in scenes.';
+        } else {
+            this.elements.executeCommandBtn.title = 'Execute custom command with LLM';
+        }
     }
     
     /**
      * Execute free-style natural language command
+     * @param {string} directCommand - Optional command to execute directly (from quick buttons)
      */
-    async executeFreestyleCommand() {
-        const command = this.elements.freestyleCommandInput.value.trim();
+    async executeFreestyleCommand(directCommand = null) {
+        const command = directCommand || this.elements.freestyleCommandInput.value.trim();
         if (!command) return;
         
         this.elements.executeCommandBtn.disabled = true;
@@ -2380,6 +2395,9 @@ if __name__ == "__main__":
                 btn.title = isConfigured ? '' : 'Configure AI API key to enable RL commands';
             }
         });
+        
+        // Update Execute button state based on API key
+        this.handleFreestyleInputChange();
         
         if (isConfigured) {
             indicator.className = 'status-indicator-compact status-configured';
