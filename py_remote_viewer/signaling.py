@@ -114,12 +114,16 @@ class SignalingServer:
 
         try:
             # Use LLM to generate scene
+            logger.info(f"Calling LLM generator for prompt: '{prompt[:100]}...'")
             scene_description = await asyncio.get_event_loop().run_in_executor(
                 None, self.llm_generator.generate_scene_description, prompt
             )
 
+            logger.info(f"LLM generator returned: {type(scene_description)}, has to_xml: {hasattr(scene_description, 'to_xml') if scene_description else False}")
+
             if scene_description and hasattr(scene_description, "to_xml"):
                 scene_xml = scene_description.to_xml()
+                logger.info(f"Successfully generated XML from LLM ({len(scene_xml)} chars)")
 
                 # Store and broadcast the generated scene
                 self.current_scene_xml = scene_xml
@@ -132,6 +136,7 @@ class SignalingServer:
                 }
             else:
                 # Fallback to basic scene generation
+                logger.warning(f"LLM returned invalid scene_description (type={type(scene_description)}), using fallback")
                 scene_xml = self._generate_basic_scene_from_prompt(prompt)
                 return {
                     "success": True,
@@ -140,7 +145,7 @@ class SignalingServer:
                 }
 
         except Exception as e:
-            print(f"[SignalingServer] LLM scene generation failed: {e}")
+            logger.error(f"LLM scene generation failed: {e}", exc_info=True)
             # Fallback to basic scene generation
             scene_xml = self._generate_basic_scene_from_prompt(prompt)
             return {
