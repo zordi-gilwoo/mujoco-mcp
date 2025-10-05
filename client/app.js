@@ -1711,7 +1711,21 @@ if __name__ == "__main__":
                         const xml = result.scene_xml || result.xml;
                         console.log('[RemoteViewer] Loading generated XML:', xml.substring(0, 200) + '...');
                         await this.loadSceneFromXML(xml);
-                        this.showCommandResult('success', `Scene generated and loaded: ${result.message || 'Scene loaded'}`);
+                        
+                        // Show appropriate message based on whether LLM was actually used
+                        const serverMsg = result.message || '';
+                        let displayMsg;
+                        
+                        if (serverMsg.includes('fallback')) {
+                            displayMsg = `⚠️ LLM couldn't generate scene - using template instead. Scene loaded.`;
+                            this.logEvent('Warning', 'LLM generation failed, using fallback template');
+                        } else if (serverMsg.includes('LLM')) {
+                            displayMsg = `✓ Custom scene generated with AI and loaded successfully!`;
+                        } else {
+                            displayMsg = `✓ Scene loaded successfully`;
+                        }
+                        
+                        this.showCommandResult('success', displayMsg);
                         this.logEvent('Command', '✓ AI scene generated and loaded into viewer');
                     } else {
                         console.warn('[RemoteViewer] No XML in result:', result);
