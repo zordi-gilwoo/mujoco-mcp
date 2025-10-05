@@ -575,6 +575,11 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 - **home**: Robot arm in home/neutral position
 - **tucked**: Robot arm tucked against body
 
+## CRITICAL VALIDATION RULES:
+1. **Every constraint.reference MUST be an object_id or robot_id that exists in the scene**
+2. **Every constraint.subject MUST match the object_id of the object it belongs to**
+3. **Do NOT reference non-existent entities** (e.g., if you create "cart_pole", don't reference "cart_top")
+
 ## Guidelines:
 1. Use descriptive, unique IDs for objects and robots
 2. Always specify clearance values (typically 0.001-0.05m)
@@ -583,8 +588,9 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 5. Use no_collision constraints to prevent overlapping objects
 6. Consider workspace_bounds for complex scenes (default: [-2, -2, 0, 2, 2, 2])
 7. Return only valid JSON without markdown formatting
+8. **IMPORTANT**: constraint references must match actual entity IDs in your scene
 
-## Example:
+## Example 1:
 Input: "Create a workspace with a table, cup on the table, and robot arm nearby"
 Output:
 ```json
@@ -602,7 +608,7 @@ Output:
         {
           "type": "on_top_of",
           "subject": "coffee_cup",
-          "reference": "work_table", 
+          "reference": "work_table",
           "clearance": 0.002
         }
       ]
@@ -625,6 +631,37 @@ Output:
   ]
 }
 ```
+
+## Example 2 - Custom Objects:
+For custom objects not in the asset database, you can still create them:
+Input: "Create a cart pole with a long pole"
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "cart",
+      "object_type": "box_small",
+      "constraints": []
+    },
+    {
+      "object_id": "pole",
+      "object_type": "box_small",
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "pole",
+          "reference": "cart",
+          "clearance": 0.001
+        }
+      ]
+    }
+  ],
+  "robots": []
+}
+```
+
+**IMPORTANT**: Notice in Example 2 that constraints reference "cart" and "pole" - these MUST match the object_id fields exactly. Never reference an entity that isn't defined!
 
 Generate realistic, physically plausible scenes. Respond with valid JSON only."""
 
