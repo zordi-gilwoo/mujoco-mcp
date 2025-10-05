@@ -820,6 +820,90 @@ Output:
 }
 ```
 
+## Example 3 - Line Up Objects on Table:
+Input: "Place a table, then line up three cylinders on top: a 0.4m green post, a 0.8m orange post, and a 1.2m blue post"
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "table",
+      "object_type": "table_standard",
+      "constraints": []
+    },
+    {
+      "object_id": "green_post",
+      "object_type": "primitive:cylinder",
+      "dimensions": {
+        "radius": 0.05,
+        "height": 0.4
+      },
+      "color": [0.0, 1.0, 0.0, 1.0],
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "green_post",
+          "reference": "table",
+          "clearance": 0.001
+        }
+      ]
+    },
+    {
+      "object_id": "orange_post",
+      "object_type": "primitive:cylinder",
+      "dimensions": {
+        "radius": 0.05,
+        "height": 0.8
+      },
+      "color": [1.0, 0.5, 0.0, 1.0],
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "orange_post",
+          "reference": "table",
+          "clearance": 0.001
+        },
+        {
+          "type": "beside",
+          "subject": "orange_post",
+          "reference": "green_post",
+          "clearance": 0.1
+        }
+      ]
+    },
+    {
+      "object_id": "blue_post",
+      "object_type": "primitive:cylinder",
+      "dimensions": {
+        "radius": 0.05,
+        "height": 1.2
+      },
+      "color": [0.0, 0.0, 1.0, 1.0],
+      "constraints": [
+        {
+          "type": "on_top_of",
+          "subject": "blue_post",
+          "reference": "table",
+          "clearance": 0.001
+        },
+        {
+          "type": "beside",
+          "subject": "blue_post",
+          "reference": "orange_post",
+          "clearance": 0.1
+        }
+      ]
+    }
+  ],
+  "robots": []
+}
+```
+
+**IMPORTANT**: When objects need both horizontal AND vertical positioning, specify BOTH constraint types:
+- Use `on_top_of` to control Z position (vertical placement)
+- Use `beside` or `in_front_of` to control XY position (horizontal placement)
+The constraint solver will compose them correctly - horizontal constraints set XY, vertical constraints set Z.
+
 **REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
 
     def build_llm_prompt(self, user_prompt: str) -> Dict[str, str]:

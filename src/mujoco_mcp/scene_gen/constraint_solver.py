@@ -296,7 +296,7 @@ class ConstraintSolver:
         poses: Dict[str, Pose],
         scene: SceneDescription,
     ) -> Pose:
-        """Place an entity based on its constraints."""
+        """Place an entity based on its constraints with axis-aware composition."""
         if not constraints:
             raise ValueError(
                 f"Entity {entity_id} has no constraints but was called for constrained placement"
@@ -304,17 +304,80 @@ class ConstraintSolver:
 
         # Get entity metadata
         entity_metadata = self._get_entity_metadata(entity_id, scene)
-
-        # Start with default pose
-        position = np.array([0.0, 0.0, 0.0])
         orientation = self._get_entity_orientation(entity_id, scene)
 
-        # Apply each constraint in sequence
+        # Separate constraints by the axes they control
+        vertical_constraints = []  # Control Z: on_top_of, inside
+        horizontal_constraints = []  # Control XY: beside, in_front_of
+        full_constraints = []  # Control all axes: aligned_with_axis, within_reach
+
         for constraint in constraints:
             if constraint.type == "no_collision":
                 continue  # Handle collision constraints in separate phase
+            elif constraint.type in ["on_top_of", "inside"]:
+                vertical_constraints.append(constraint)
+            elif constraint.type in ["beside", "in_front_of"]:
+                horizontal_constraints.append(constraint)
+            else:  # aligned_with_axis, within_reach
+                full_constraints.append(constraint)
 
-            position = self._apply_constraint(constraint, position, entity_metadata, poses, scene)
+        # Initialize position components
+        xy_position = np.array([0.0, 0.0])
+        z_position = 0.0
+
+        # Apply full constraints first (they set everything)
+        if full_constraints:
+            temp_pos = np.array([0.0, 0.0, 0.0])
+            for constraint in full_constraints:
+                temp_pos = self._apply_constraint(
+                    constraint, temp_pos, entity_metadata, poses, scene, orientation
+                )
+            xy_position = temp_pos[:2]
+            z_position = temp_pos[2]
+            logger.debug(
+                f"Applied {len(full_constraints)} full constraint(s) to {entity_id}: pos={temp_pos}"
+            )
+
+        # Apply horizontal constraints (update XY only)
+        if horizontal_constraints:
+            current_xy = xy_position.copy()
+
+            for i, constraint in enumerate(horizontal_constraints):
+                # Pass current position so constraint can see what's been set
+                temp_pos = np.array([current_xy[0], current_xy[1], z_position])
+                result_pos = self._apply_constraint(
+                    constraint, temp_pos, entity_metadata, poses, scene, orientation
+                )
+                current_xy = result_pos[:2]
+
+                # For first horizontal constraint, take Z if not set by full constraint
+                if i == 0 and not full_constraints and abs(result_pos[2]) > 1e-6:
+                    z_position = result_pos[2]
+
+                logger.debug(
+                    f"Applied horizontal constraint {constraint.type} to {entity_id}: XY={current_xy}, Z={z_position}"
+                )
+
+            xy_position = current_xy
+
+        # Apply vertical constraints (update Z only, preserve XY)
+        if vertical_constraints:
+            # Pass the current XY position so it's preserved
+            temp_pos = np.array([xy_position[0], xy_position[1], z_position])
+
+            for constraint in vertical_constraints:
+                result_pos = self._apply_constraint(
+                    constraint, temp_pos, entity_metadata, poses, scene, orientation
+                )
+                z_position = result_pos[2]
+                # ✅ XY from horizontal constraints is preserved
+
+                logger.debug(
+                    f"Applied vertical constraint {constraint.type} to {entity_id}: Z={z_position} (preserved XY={xy_position})"
+                )
+
+        position = np.array([xy_position[0], xy_position[1], z_position])
+        logger.debug(f"Final position for {entity_id}: {position}")
 
         return Pose(position=position, orientation=orientation)
 
@@ -367,6 +430,7 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         poses: Dict[str, Pose],
         scene: SceneDescription,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
         """Apply a single constraint to determine new position."""
         reference_pose = poses[constraint.reference]
@@ -374,32 +438,54 @@ class ConstraintSolver:
 
         if constraint.type == "on_top_of":
             return self._apply_on_top_of(
-                constraint, entity_metadata, reference_pose, reference_metadata
+                constraint,
+                entity_metadata,
+                reference_pose,
+                reference_metadata,
+                entity_orientation,
             )
-        elif constraint.type == "in_front_of":
+        if constraint.type == "in_front_of":
             return self._apply_in_front_of(
-                constraint, entity_metadata, reference_pose, reference_metadata
+                constraint,
+                entity_metadata,
+                reference_pose,
+                reference_metadata,
+                current_position,
+                entity_orientation,
             )
-        elif constraint.type == "beside":
+        if constraint.type == "beside":
             return self._apply_beside(
-                constraint, entity_metadata, reference_pose, reference_metadata
+                constraint,
+                entity_metadata,
+                reference_pose,
+                reference_metadata,
+                current_position,
+                entity_orientation,
             )
         # Phase 2B: New constraint types
-        elif constraint.type == "inside":
+        if constraint.type == "inside":
             return self._apply_inside(
-                constraint, entity_metadata, reference_pose, reference_metadata
+                constraint,
+                entity_metadata,
+                reference_pose,
+                reference_metadata,
+                entity_orientation,
             )
-        elif constraint.type == "aligned_with_axis":
+        if constraint.type == "aligned_with_axis":
             return self._apply_aligned_with_axis(
-                constraint, entity_metadata, reference_pose, reference_metadata
+                constraint,
+                entity_metadata,
+                reference_pose,
+                reference_metadata,
+                entity_orientation,
             )
-        elif constraint.type == "within_reach":
+        if constraint.type == "within_reach":
             return self._apply_within_reach(
                 constraint, entity_metadata, reference_pose, reference_metadata, scene
             )
-        else:
-            logger.warning(f"Unknown constraint type: {constraint.type}")
-            return current_position
+
+        logger.warning(f"Unknown constraint type: {constraint.type}")
+        return current_position
 
     def _apply_on_top_of(
         self,
@@ -407,35 +493,34 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         reference_pose: Pose,
         reference_metadata: AssetMetadata,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
-        """Apply on_top_of constraint."""
-        # Get reference top surface
-        ref_top = reference_metadata.get_semantic_point("top_surface")
-        if ref_top is None:
-            # Fallback to bounding box top
-            _, bbox_max = reference_metadata.get_bounding_box()
-            ref_top = [reference_pose.position[0], reference_pose.position[1], bbox_max[2]]
+        """Apply on_top_of constraint using orientation-aware semantics."""
+
+        ref_top_local = reference_metadata.get_semantic_point("top_surface")
+        if ref_top_local is None:
+            bbox_min, bbox_max = reference_metadata.get_bounding_box()
+            ref_top_local = np.array([0.0, 0.0, float(bbox_max[2])], dtype=float)
         else:
-            ref_top = reference_pose.position + np.array(ref_top)
+            ref_top_local = np.array(ref_top_local, dtype=float)
 
-        # Get entity bottom surface offset
-        entity_bottom = entity_metadata.get_semantic_point("bottom_surface")
-        if entity_bottom is None:
-            entity_bottom = [0, 0, 0]
+        ref_top_world = self._transform_point(reference_pose, ref_top_local)
+        ref_normal = self._rotate_vector(reference_pose.orientation, np.array([0.0, 0.0, 1.0]))
+        if np.linalg.norm(ref_normal) < 1e-6:
+            ref_normal = np.array([0.0, 0.0, 1.0])
 
-        # Calculate position to place entity bottom at reference top + clearance
-        position = np.array(
-            [
-                ref_top[0] - entity_bottom[0],
-                ref_top[1] - entity_bottom[1],
-                ref_top[2] + constraint.clearance - entity_bottom[2],
-            ]
-        )
+        entity_bottom_local = entity_metadata.get_semantic_point("bottom_surface")
+        if entity_bottom_local is None:
+            bbox_min, _ = entity_metadata.get_bounding_box()
+            entity_bottom_local = np.array([0.0, 0.0, float(bbox_min[2])], dtype=float)
+        else:
+            entity_bottom_local = np.array(entity_bottom_local, dtype=float)
 
-        # Apply optional offset
-        if constraint.offset:
-            position += np.array(constraint.offset)
+        bottom_offset_world = self._rotate_vector(entity_orientation, entity_bottom_local)
+        clearance_vector = ref_normal * constraint.clearance
+        offset = np.array(constraint.offset) if constraint.offset else np.zeros(3)
 
+        position = ref_top_world + clearance_vector - bottom_offset_world + offset
         return position
 
     def _apply_in_front_of(
@@ -444,25 +529,81 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         reference_pose: Pose,
         reference_metadata: AssetMetadata,
+        current_position: np.ndarray,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
-        """Apply in_front_of constraint (places entity in +X direction from reference)."""
-        # Get reference dimensions
+        """Apply in_front_of constraint using reference orientation."""
+
         ref_dims = reference_metadata.get_dimensions()
-        ref_width = ref_dims.get("width", 0.1)
-
-        # Get entity dimensions
         entity_dims = entity_metadata.get_dimensions()
-        entity_width = entity_dims.get("width", 0.1)
 
-        # Place entity in front (positive X direction)
+        # ✅ Use proper dimension handling for different primitive types
+        ref_half = self._get_lateral_extent(ref_dims, "X") / 2.0
+        entity_half = self._get_lateral_extent(entity_dims, "X") / 2.0
+        distance = ref_half + entity_half + constraint.clearance
+
+        direction = self._rotate_vector(reference_pose.orientation, np.array([1.0, 0.0, 0.0]))
+        direction = direction / np.linalg.norm(direction)
+
+        # ✅ Start from reference position, add offset in X direction
         position = reference_pose.position.copy()
-        position[0] += ref_width / 2 + entity_width / 2 + constraint.clearance
+        position += direction * distance
 
-        # Apply optional offset
+        # ✅ Preserve Z from current position if already set by vertical constraint
+        if np.any(current_position) and abs(current_position[2]) > 1e-6:
+            position[2] = current_position[2]
+            logger.debug(f"Preserved Z={position[2]:.3f} from vertical constraint in in_front_of")
+
         if constraint.offset:
             position += np.array(constraint.offset)
 
         return position
+
+    @staticmethod
+    def _quat_to_matrix(quat: np.ndarray) -> np.ndarray:
+        q = np.array(quat, dtype=float)
+        if q.shape[0] != 4:
+            return np.eye(3)
+        norm = np.linalg.norm(q)
+        if norm == 0:
+            return np.eye(3)
+        q = q / norm
+        x, y, z, w = q
+        return np.array(
+            [
+                [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+                [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+                [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+            ]
+        )
+
+    def _rotate_vector(self, quat: np.ndarray, vector: np.ndarray) -> np.ndarray:
+        return self._quat_to_matrix(quat).dot(vector)
+
+    def _transform_point(self, pose: Pose, local_point: np.ndarray) -> np.ndarray:
+        return pose.position + self._quat_to_matrix(pose.orientation).dot(local_point)
+
+    def _get_lateral_extent(self, dims: Dict[str, float], axis: str) -> float:
+        """Get lateral extent for an object along an axis.
+
+        Args:
+            dims: Dimension dictionary from metadata
+            axis: "X", "Y", or "Z"
+
+        Returns:
+            Full extent (not half-extent) in meters
+        """
+        # For cylinders and spheres: use diameter (2 * radius) for X/Y
+        if "radius" in dims and axis in ["X", "Y"]:
+            return dims["radius"] * 2.0
+
+        # For boxes: use appropriate dimension
+        if axis == "X":
+            return dims.get("width", 0.1)
+        elif axis == "Y":
+            return dims.get("depth", 0.1)
+        else:  # Z
+            return dims.get("height", 0.1)
 
     def _apply_beside(
         self,
@@ -470,21 +611,31 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         reference_pose: Pose,
         reference_metadata: AssetMetadata,
+        current_position: np.ndarray,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
-        """Apply beside constraint (places entity in +Y direction from reference)."""
-        # Get reference dimensions
+        """Apply beside constraint using reference orientation."""
+
         ref_dims = reference_metadata.get_dimensions()
-        ref_depth = ref_dims.get("depth", 0.1)
-
-        # Get entity dimensions
         entity_dims = entity_metadata.get_dimensions()
-        entity_depth = entity_dims.get("depth", 0.1)
 
-        # Place entity beside (positive Y direction)
+        # ✅ Use proper dimension handling for different primitive types
+        ref_half = self._get_lateral_extent(ref_dims, "Y") / 2.0
+        entity_half = self._get_lateral_extent(entity_dims, "Y") / 2.0
+        distance = ref_half + entity_half + constraint.clearance
+
+        direction = self._rotate_vector(reference_pose.orientation, np.array([0.0, 1.0, 0.0]))
+        direction = direction / np.linalg.norm(direction)
+
+        # ✅ Start from reference position, add offset in Y direction
         position = reference_pose.position.copy()
-        position[1] += ref_depth / 2 + entity_depth / 2 + constraint.clearance
+        position += direction * distance
 
-        # Apply optional offset
+        # ✅ Preserve Z from current position if already set by vertical constraint
+        if np.any(current_position) and abs(current_position[2]) > 1e-6:
+            position[2] = current_position[2]
+            logger.debug(f"Preserved Z={position[2]:.3f} from vertical constraint in beside")
+
         if constraint.offset:
             position += np.array(constraint.offset)
 
@@ -561,6 +712,7 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         reference_pose: Pose,
         reference_metadata: AssetMetadata,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
         """Apply inside constraint (entity placed inside reference container)."""
         # Place entity at center of reference container
@@ -578,23 +730,22 @@ class ConstraintSolver:
         entity_metadata: AssetMetadata,
         reference_pose: Pose,
         reference_metadata: AssetMetadata,
+        entity_orientation: np.ndarray,
     ) -> np.ndarray:
         """Apply aligned_with_axis constraint (entity aligned along an axis of reference)."""
-        # For now, align along X-axis at same Y and Z
-        position = reference_pose.position.copy()
-
-        # Get reference dimensions to place entity next to reference
         ref_dims = reference_metadata.get_dimensions()
         entity_dims = entity_metadata.get_dimensions()
 
-        # Place along X-axis with clearance
-        position[0] += (
-            ref_dims.get("width", 0.1) / 2
-            + entity_dims.get("width", 0.1) / 2
+        axis = np.array([1.0, 0.0, 0.0])
+        direction = self._rotate_vector(reference_pose.orientation, axis)
+        distance = (
+            ref_dims.get("width", 0.1) / 2.0
+            + entity_dims.get("width", 0.1) / 2.0
             + constraint.clearance
         )
 
-        # Apply optional offset
+        position = reference_pose.position + direction * distance
+
         if constraint.offset:
             position += np.array(constraint.offset)
 
@@ -672,7 +823,7 @@ class ConstraintSolver:
 
                 # Use spatial reasoner to enhance placement
                 enhanced_pose, stability_score = self.spatial_reasoner.enhance_object_placement(
-                    obj, support_metadata, support_pose
+                    obj, support_metadata, support_pose, enhanced_poses[obj.object_id]
                 )
 
                 # Apply any additional constraints (like offset)
