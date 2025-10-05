@@ -1,6 +1,4 @@
-# MuJoCo MCP - Enterprise Robotics Simulation Platform
-
-(Gilwoo - making small edits)
+# MuJoCo MCP
 
 [![Version](https://img.shields.io/badge/version-0.8.2-blue.svg)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
@@ -8,340 +6,219 @@
 [![MCP](https://img.shields.io/badge/MCP-2024--11--05-purple.svg)](https://modelcontextprotocol.io/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-🤖 Advanced robotics simulation platform that enables AI assistants to control complex physics simulations through natural language. Built on MuJoCo physics engine and Model Context Protocol for seamless integration with Claude Desktop and other MCP clients.
+Control MuJoCo physics simulations through natural language using the Model Context Protocol. Integrates with Claude Desktop and other MCP clients for seamless AI-powered robotics control.
 
-🚀 **[Quick Start](#quick-start)** | 📚 **[Documentation](DOCUMENTATION_INDEX.md)** | 🏗️ **[Architecture](ARCHITECTURE.md)** | 🔧 **[API Reference](API_REFERENCE.md)** | 🎯 **[Advanced Features](ADVANCED_FEATURES_GUIDE.md)**
+📚 **[Documentation](DOCUMENTATION_INDEX.md)** | 🏗️ **[Architecture](ARCHITECTURE.md)** | 🔧 **[API Reference](API_REFERENCE.md)**
 
-## 🌟 Features
-
-### Core Capabilities
-
-- **Natural Language Control**: Control robots using plain English commands
-- **Real-time Visualization**: Native MuJoCo viewer with interactive GUI
-- **MCP Standard Compliance**: Full Model Context Protocol implementation
-- **Cross-Platform Support**: Works on macOS, Linux, and Windows
-
-### Advanced Features (v0.8.2)
-
-- **🎛️ Advanced Control Algorithms**: PID, trajectory planning, optimization control
-- **🤖 Multi-Robot Coordination**: Formation control, cooperative manipulation
-- **🔬 Sensor Feedback Systems**: Closed-loop control with multi-modal sensors
-- **🧠 RL Integration**: Gymnasium-compatible reinforcement learning environments
-- **📊 Physics Benchmarking**: Performance, accuracy, and scalability testing
-- **📈 Real-time Monitoring**: Advanced visualization and analytics tools
-- **🚀 Production Ready**: Enhanced server with connection pooling and diagnostics
-- **🔀 Process Pool Architecture**: Isolated processes for true multi-client support
-- **🔌 Automatic Port Allocation**: Dynamic port management prevents conflicts
-- **💾 Session Management**: Complete client isolation and resource cleanup
+---
 
 ## Quick Start
 
-### 1. Install Dependencies
-
+### 1. Install
 ```bash
 pip install mujoco mcp numpy
-```
-
-### 2. Install MuJoCo MCP
-
-```bash
 pip install -e .
 ```
 
-### 3. Start the Viewer Server
-
-```bash
-python mujoco_viewer_server.py
-```
-
-### 4. Configure Claude Desktop
-
+### 2. Configure Claude Desktop
 Add to your Claude Desktop config:
-
 ```json
 {
   "mcpServers": {
     "mujoco-mcp": {
       "command": "python",
       "args": ["-m", "mujoco_mcp"],
-      "env": {
-        "PYTHONPATH": "./src"
-      }
+      "env": {"PYTHONPATH": "./src"}
     }
   }
 }
 ```
 
-### 5. Start Using Natural Language Commands
-
+### 3. Use Natural Language
 In Claude Desktop:
-
 ```
 "Create a pendulum simulation"
 "Set the pendulum angle to 45 degrees"
 "Step the simulation 100 times"
-"Show me the current state"
 ```
 
-## 🌐 Browser-Based Visualization
+---
 
-MuJoCo MCP provides two browser-based options for real-time simulation visualization:
+## Features
 
-### Option 1: WebRTC Remote Viewer (Recommended)
+### Core Capabilities
+- 🗣️ **Natural Language Control** - Control robots with plain English
+- 🎮 **Real-time Visualization** - Native MuJoCo viewer GUI
+- 🌐 **Browser-Based Viewer** - WebRTC streaming with 60 FPS
+- 🤖 **56+ Robot Models** - Full MuJoCo Menagerie integration
+- 🎯 **Scene Generation** - LLM-powered scene creation from text
 
-Full-featured WebRTC viewer with real-time video streaming, multi-client support, and interactive controls.
+### Advanced Features
+- **Advanced Controllers** - PID, trajectory planning, MPC
+- **Multi-Robot Coordination** - Formation control, cooperative tasks
+- **RL Integration** - Gymnasium-compatible environments
+- **GPU Acceleration** - EGL headless rendering, H.264 encoding
+- **Multi-Client Support** - Process-based isolation, auto port allocation
 
-**Features:**
-- Real-time 60 FPS video streaming with WebRTC
-- Multi-client support with session isolation
-- Interactive mouse/keyboard camera controls
-- Natural language scene creation (OpenAI, Claude, Gemini)
-- GPU acceleration with EGL rendering
-- Hardware H.264 encoding support
+---
 
-**Quick Start:**
+## MCP Tools
+
+| Tool | Description |
+|------|-------------|
+| `get_server_info` | Get server status and capabilities |
+| `create_scene` | Create physics simulation |
+| `step_simulation` | Advance simulation time |
+| `get_state` | Get current simulation state |
+| `set_joint_positions` | Control joint angles |
+| `reset_simulation` | Reset to initial state |
+| `execute_command` | Natural language commands |
+| `close_viewer` | Close visualization window |
+
+See [API Reference](API_REFERENCE.md) for complete documentation.
+
+---
+
+## Browser Visualization
+
+### WebRTC Viewer (Recommended)
+Real-time browser-based visualization with multi-client support.
+
 ```bash
-# Start the WebRTC viewer server
+# Start viewer
 ./scripts/run_py_viewer.sh
 
-# Or using Python module directly
+# Or using Python module
 python -m py_remote_viewer
 
-# With custom configuration
-VIEWER_PORT=8001 DEBUG_MODE=1 python -m py_remote_viewer
+# Open browser
+open http://localhost:8000
 ```
-
-**Access:** Open browser to `http://localhost:8000`
-
-**Key Controls:**
-- Left-click + drag: Rotate camera
-- Right-click + drag: Pan camera
-- Scroll wheel: Zoom
-- Arrow keys: Precise rotation
-- Space bar: Pause/resume
-
-**API Endpoints:**
-- `GET /api/health` - Server health check
-- `GET /api/config` - Configuration details
-- `GET /api/stats` - Performance metrics and client statistics
-- `POST /api/scene/load` - Load MuJoCo XML scenes
-- `WS /ws/signaling` - WebRTC signaling and events
-
-See [WebRTC Viewer Guide](docs/WEBRTC_VIEWER.md) for complete documentation.
-
-### Option 2: Simple Web Interface
-
-Lightweight REST API interface for command execution and scene management.
-
-**Quick Start:**
-```bash
-# Start the simple web server
-python web_server.py
-```
-
-**Access:** Open browser to `http://localhost:8080`
 
 **Features:**
-- Simple HTML/CSS/JS interface
-- REST API for MCP command execution
-- Scene loading and management
-- API key configuration for LLM integration
+- 60 FPS video streaming
+- Multi-client collaboration
+- Interactive camera controls
+- LLM-powered scene creation
+- GPU acceleration
 
-**API Endpoints:**
-- `POST /api/execute-command` - Execute MCP commands
-- `POST /api/scene/load` - Load scenes from XML
-- `GET /api/config` - Get server configuration
-- `POST /api/config/api-key` - Configure LLM API keys
+See [WebRTC Viewer Guide](docs/guides/WEBRTC_VIEWER_GUIDE.md) for details.
 
-## 📝 Example Usage
+---
 
-### Basic Physics Simulations
+## Scene Generation
 
+Create MuJoCo scenes from natural language:
+
+```bash
+# Generate scene from text
+PYTHONPATH=./src python text_llm.py "create a cart pole with a 2m long pole"
 ```
-# Simple pendulum
+
+**Example Prompts:**
+- "Create a cluttered workbench with a table and three boxes"
+- "Place a table, then line up three cylinders on top"
+- "Build a cart-pole rig with a 1.8m pole tilted 15 degrees"
+- "Create a double pendulum with two 1.5m cylinders"
+- "Stack three boxes and balance a sphere on top"
+
+Requires `OPENAI_API_KEY` environment variable.
+
+---
+
+## Robot Control Examples
+
+### Basic Physics
+```
 "Create a pendulum simulation"
-"Set the pendulum to 90 degrees and let it swing"
-
-# Double pendulum (chaotic motion)
 "Create a double pendulum"
-"Give it a small push and watch the chaos"
-
-# Cart-pole balancing
 "Create a cart pole simulation"
-"Try to balance the pole"
 ```
 
-### Advanced Robot Control
-
+### Robot Control
 ```
-# Load robot from MuJoCo Menagerie
 "Load a Franka Panda robot"
 "Move the robot arm in a circle"
 "Set all joints to home position"
-
-# Multi-robot coordination
-"Create two robot arms side by side"
-"Make them work together to lift a box"
-
-# Walking robots
-"Load the Unitree Go2 quadruped"
-"Make it walk forward"
 ```
 
-### Reinforcement Learning
+### Multi-Robot
+```
+"Create two robot arms side by side"
+"Make them work together to lift a box"
+```
 
+### RL Training
 ```python
 from mujoco_mcp.rl_integration import create_reaching_env
 
-# Create RL environment
 env = create_reaching_env("franka_panda")
-
-# Train your agent
 obs, info = env.reset()
 for _ in range(1000):
-    action = env.action_space.sample()  # Your policy here
-    obs, reward, terminated, truncated, info = env.step(action)
-    if terminated or truncated:
-        obs, info = env.reset()
+    action = env.action_space.sample()
+    obs, reward, done, truncated, info = env.step(action)
 ```
 
-## 🛠️ MCP Tools Available
+---
 
-| Tool | Description | Example |
-|------|-------------|---------|
-| `get_server_info` | Get server status | Returns version, capabilities |
-| `create_scene` | Create physics simulation | `{"scene_type": "pendulum"}` |
-| `step_simulation` | Advance simulation | `{"steps": 100}` |
-| `get_state` | Get current state | Returns positions, velocities |
-| `set_joint_positions` | Control joints | `{"positions": [0, 0.785, 0]}` |
-| `reset_simulation` | Reset to initial | Resets physics state |
-| `execute_command` | Natural language | `{"command": "move arm up"}` |
-| `get_loaded_models` | List active models | Returns all loaded models |
-| `close_viewer` | Close GUI window | Closes visualization |
-| `get_session_info` | Session and model info | Returns current session details |
-| `get_process_pool_stats` | Process pool status | Returns process pool statistics |
-| `list_active_processes` | Active processes | Lists all running viewer processes |
-| `terminate_process` | Terminate process | `{"session_id": "session_123"}` |
+## Advanced Setup
 
-## 🚀 Advanced Setup
-
-### Process-Based Multi-Client Architecture
-
-MuJoCo MCP uses a process-based architecture where each client gets a dedicated viewer process:
-
-```python
-# Each client gets dedicated viewer process with complete isolation
-from mujoco_mcp.session_manager import SessionManager
-
-session_manager = SessionManager()
-# - Dedicated viewer process (PID isolation)
-# - Automatic port allocation (8001-9000)
-# - Independent memory space
-# - Complete crash isolation
-# - Automatic cleanup on disconnect
-```
-
-**Key Benefits:**
-
-- 🔒 **Complete Isolation**: Memory and process separation between clients
-- 🔌 **Auto Port Management**: Dynamic port allocation and conflict prevention
-- 📊 **Health Monitoring**: Background process monitoring and auto-restart
-- 🧹 **Automatic Cleanup**: Resources freed on client disconnect
-- 🚀 **Enterprise Scale**: Support for hundreds of concurrent clients
-- 🛡️ **Crash Protection**: One client failure doesn't affect others
-
-**Process Management MCP Tools:**
-
-- `get_process_pool_stats` - Process pool statistics and health
-- `list_active_processes` - Show all running viewer processes
-- `terminate_process` - Manually terminate specific processes
-
-**Demo Application:**
-
+### MuJoCo Menagerie (Robot Models)
 ```bash
-# Run the multi-client process-based demo
-python demo_multi_client_process_based.py
+git clone https://github.com/google-deepmind/mujoco_menagerie.git ~/mujoco_menagerie
+export MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
 ```
 
-See [PROCESS_POOL_ARCHITECTURE.md](PROCESS_POOL_ARCHITECTURE.md) for technical details.
+### Process Pool Architecture
+Each client gets an isolated viewer process with automatic port allocation and cleanup. See [Process Pool Architecture](docs/architecture/PROCESS_POOL_ARCHITECTURE.md).
 
-### Install MuJoCo Menagerie (for robot models)
+---
 
-```bash
-# Clone the menagerie (or use your existing location)
-git clone https://github.com/google-deepmind/mujoco_menagerie.git /path/to/mujoco_menagerie
+## Documentation
 
-# Persist the path in your conda env (Option 1 - recommended)
-conda activate mujoco
-conda env config vars set MUJOCO_MENAGERIE_PATH=/absolute/path/to/mujoco_menagerie
-conda deactivate && conda activate mujoco
-
-# Verify
-conda env config vars list | grep MUJOCO_MENAGERIE_PATH
-echo "$MUJOCO_MENAGERIE_PATH"
-```
-
-### Use Enhanced Production Server
-
-```bash
-# For better performance and reliability
-/opt/miniconda3/bin/mjpython mujoco_viewer_server_enhanced.py --port 8888
-```
-
-### Run Comprehensive Tests
-
-```bash
-# Test basic functionality
-python scripts/quick_internal_test.py
-
-# Test advanced features
-python test_advanced_features.py
-
-# Run benchmarks
-python benchmarks/physics_benchmarks.py
-```
-
-## 📚 Documentation
-
-- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete guide to all docs
-- **[Architecture Guide](ARCHITECTURE.md)** - System design and components
-- **[API Reference](API_REFERENCE.md)** - Complete API documentation
-- **[Advanced Features](ADVANCED_FEATURES_GUIDE.md)** - Controllers, RL, multi-robot
-- **[Motion Control Examples](examples/README_MOTION_CONTROL.md)** - Robot demos
-- **[Testing Summary](TESTING_SUMMARY.md)** - Test coverage and results
+- **[Documentation Index](DOCUMENTATION_INDEX.md)** - Complete documentation hub
+- **[Architecture](ARCHITECTURE.md)** - System design
+- **[API Reference](API_REFERENCE.md)** - Complete API
+- **[WebRTC Guide](docs/guides/WEBRTC_VIEWER_GUIDE.md)** - Browser viewer
+- **[Claude Guide](docs/guides/CLAUDE_GUIDE.md)** - Claude Desktop setup
+- **[Advanced Features](docs/features/ADVANCED_FEATURES_GUIDE.md)** - Advanced capabilities
+- **[Testing](docs/testing/TESTING.md)** - How to run tests
 - **[Changelog](CHANGELOG.md)** - Version history
 
-## 🤝 Contributing
+---
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+## Troubleshooting
 
-## 🐛 Troubleshooting
+**"Failed to connect to viewer server"**
+- Start server: `python mujoco_viewer_server.py`
+- Check port 8888 is available
+- On macOS: use `/opt/miniconda3/bin/mjpython`
 
-### Common Issues
+**"Model not found"**
+- Install MuJoCo Menagerie
+- Set `MUJOCO_MENAGERIE_PATH` environment variable
 
-1. **"Failed to connect to viewer server"**
-   - Make sure `mujoco_viewer_server.py` is running
-   - Check port 8888 is available
-   - On macOS, use `/opt/miniconda3/bin/mjpython`
+**Performance issues**
+- Use enhanced server: `python mujoco_viewer_server_enhanced.py`
+- Enable GPU acceleration (see EGL_H264_FEATURES.md)
 
-2. **"Model not found"**
-   - Install MuJoCo Menagerie for robot models
-   - Check file paths in configurations
+---
 
-3. **Performance issues**
-   - Use the enhanced viewer server
-   - Enable connection pooling
-   - Check system resources
+## Contributing
 
-For more help, see the [Documentation Index](DOCUMENTATION_INDEX.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-## 📄 License
+---
 
-MIT License - see [LICENSE](LICENSE) file for details.
+## License
 
-## 🙏 Acknowledgments
+MIT License - see [LICENSE](LICENSE) for details.
 
-- [MuJoCo](https://mujoco.org/) physics engine by Google DeepMind
+---
+
+## Acknowledgments
+
+- [MuJoCo](https://mujoco.org/) by Google DeepMind
 - [Model Context Protocol](https://modelcontextprotocol.io/) by Anthropic
 - [MuJoCo Menagerie](https://github.com/google-deepmind/mujoco_menagerie) for robot models
 

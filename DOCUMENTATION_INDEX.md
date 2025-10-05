@@ -6,7 +6,7 @@ Welcome to the MuJoCo MCP documentation. This index provides a comprehensive ove
 
 ### Current Version: **v0.8.2**
 ### MCP Protocol: **2024-11-05 Standard**
-### Last Updated: June 2025
+### Last Updated: October 2025
 
 ---
 
@@ -40,24 +40,60 @@ Welcome to the MuJoCo MCP documentation. This index provides a comprehensive ove
   - Development workflow
   - Design philosophy
 
-### Feature Documentation
-- **[SCENES_DOCUMENTATION.md](SCENES_DOCUMENTATION.md)**
-  - Built-in physics scenes
-  - Scene parameters
-  - Custom scene creation
-
-- **[WebRTC Viewer Guide](docs/WEBRTC_VIEWER_GUIDE.md)**
+### User Guides
+- **[WebRTC Viewer Guide](docs/guides/WEBRTC_VIEWER_GUIDE.md)**
   - Browser-based real-time simulation viewer
   - LLM-powered scene creation
   - Multi-client collaboration
-  - API reference and deployment
+  - Complete setup and deployment
 
-- **[ADVANCED_FEATURES_GUIDE.md](ADVANCED_FEATURES_GUIDE.md)**
+- **[Claude Desktop Guide](docs/guides/CLAUDE_GUIDE.md)**
+  - Claude Desktop MCP setup
+  - Robot control integration
+  - Step-by-step tutorials
+
+### Feature Documentation
+- **[Advanced Features](docs/features/ADVANCED_FEATURES_GUIDE.md)**
   - Advanced control algorithms
   - Multi-robot coordination
-  - Sensor feedback systems
-  - RL integration
-  - Visualization tools
+  - Sensor feedback and RL integration
+
+- **[EGL H264 Features](docs/features/EGL_H264_FEATURES.md)**
+  - GPU-accelerated rendering
+  - Hardware video encoding
+
+- **[LLM Integration](docs/features/LLM_INTEGRATION.md)**
+  - Natural language scene generation
+  - Multiple LLM providers
+
+- **[Menagerie Integration](docs/features/MENAGERIE_INTEGRATION.md)**
+  - Robot model library
+  - 56+ robot models
+
+- **[Physics Scenes](docs/features/SCENES.md)**
+  - Built-in physics scenes
+  - Scene parameters
+
+### Architecture Documentation
+- **[Multi-Client Architecture](docs/architecture/MULTI_CLIENT_ARCHITECTURE.md)**
+  - Multi-client design
+  - Session management
+  - Scalability
+
+- **[Process Pool Architecture](docs/architecture/PROCESS_POOL_ARCHITECTURE.md)**
+  - Process pool design
+  - Resource management
+  - Isolation strategy
+
+- **[Architecture Evolution](docs/architecture/ARCHITECTURE_EVOLUTION.md)**
+  - Design history
+  - Major decisions
+  - Future directions
+
+- **[WebRTC Integration Guide](docs/architecture/WEBRTC_INTEGRATION_GUIDE.md)**
+  - WebRTC architecture
+  - Integration patterns
+  - Future roadmap
 
 ### Motion Control
 - **[examples/README_MOTION_CONTROL.md](examples/README_MOTION_CONTROL.md)**
@@ -90,11 +126,11 @@ Welcome to the MuJoCo MCP documentation. This index provides a comprehensive ove
   - Breaking changes
 
 ### Testing & Quality
-- **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)**
-  - Test coverage
-  - Known issues
-  - Performance metrics
-  - Production readiness
+- **[Testing Guide](docs/testing/TESTING.md)**
+  - How to run tests
+  - Test categories
+  - Quick commands
+  - CI/CD integration
 
 ---
 
@@ -260,4 +296,4 @@ coordinator.start_coordination()
 - **Documentation**: Comprehensive (this index)
 - **License**: MIT
 
-Last documentation update: June 2025
+Last documentation update: October 2025

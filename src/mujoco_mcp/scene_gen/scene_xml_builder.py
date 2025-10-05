@@ -8,7 +8,9 @@ Generates a unified scene with proper worldbody structure, lighting, and floor.
 
 import logging
 import math
+import tempfile
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 from .scene_schema import SceneDescription
@@ -39,10 +41,13 @@ class SceneXMLBuilder:
             "capsule": 780.0,
             "ellipsoid": 600.0,
         }
-        # Robot model name mapping (scene_gen name -> menagerie name)
+        # Robot model name mapping (scene_gen name -> menagerie model/file)
         self._robot_model_mapping = {
-            "franka_panda": "franka_emika_panda",
+            "franka_panda": ("franka_emika_panda", "panda.xml"),  # (model_dir, robot_file)
         }
+        # Temporary directory for modified robot files
+        self._temp_dir = Path(tempfile.mkdtemp(prefix="mujoco_scene_"))
+        logger.debug(f"Created temp directory for robot files: {self._temp_dir}")
 
     def build_scene(
         self, scene: SceneDescription, poses: Dict[str, Pose], scene_name: str = "structured_scene"
@@ -64,14 +69,28 @@ class SceneXMLBuilder:
         mujoco = ET.Element("mujoco")
         mujoco.set("model", scene_name)
 
+        # Collect positioned robot XML trees to merge directly
+        robot_trees = []
+        for robot in scene.robots:
+            if robot.robot_id in poses:
+                robot_tree = self._get_positioned_robot_tree(robot, poses[robot.robot_id])
+                if robot_tree:
+                    robot_trees.append(robot_tree)
+
+        # Merge robot elements first (defaults, assets, etc.)
+        for robot_tree in robot_trees:
+            self._merge_robot_into_scene(mujoco, robot_tree)
+
         # Add basic configuration
         self._add_compiler_config(mujoco)
         self._add_simulation_options(mujoco)
         self._add_defaults(mujoco)
         self._add_assets(mujoco)
 
-        # Create worldbody
-        worldbody = ET.SubElement(mujoco, "worldbody")
+        # Create or get worldbody
+        worldbody = mujoco.find("worldbody")
+        if worldbody is None:
+            worldbody = ET.SubElement(mujoco, "worldbody")
 
         # Add floor and lighting
         self._add_floor_and_lighting(worldbody)
@@ -90,12 +109,23 @@ class SceneXMLBuilder:
             else:
                 logger.warning(f"No pose found for object {obj.object_id}")
 
-        # Add robots
+        # Merge robot bodies from robot_trees into worldbody
+        for robot_tree in robot_trees:
+            robot_worldbody = robot_tree.find("worldbody")
+            if robot_worldbody is not None:
+                for element in robot_worldbody:
+                    worldbody.append(element)
+                logger.debug("Merged robot worldbody into scene")
+
+        # Add fallback robots if Menagerie loader not available
         for robot in scene.robots:
-            if robot.robot_id in poses:
-                self._add_robot_to_worldbody(worldbody, robot, poses[robot.robot_id])
-            else:
+            if robot.robot_id not in poses:
                 logger.warning(f"No pose found for robot {robot.robot_id}")
+            elif not self.menagerie_loader:
+                # No Menagerie loader - use fallback
+                self._add_fallback_robot(
+                    worldbody, robot.robot_id, robot.robot_type, poses[robot.robot_id]
+                )
 
         # Convert to string with proper formatting
         xml_str = self._prettify_xml(mujoco)
@@ -103,12 +133,143 @@ class SceneXMLBuilder:
 
         return xml_str
 
+    def _get_robot_file_path(self, robot_type: str):
+        """Get the file path for a robot model from Menagerie."""
+        if not self.menagerie_loader:
+            return None
+
+        mapping = self._robot_model_mapping.get(robot_type)
+        if not mapping:
+            return None
+
+        model_dir, robot_file = mapping
+        try:
+            # Get the specific robot file (e.g., panda.xml), not scene.xml
+            return self.menagerie_loader._ensure_file_path(model_dir, robot_file)
+        except Exception as e:
+            logger.warning(f"Could not get robot file for {robot_type}: {e}")
+            return None
+
+    def _get_positioned_robot_tree(self, robot_config, pose: Pose):
+        """Get positioned robot XML tree for merging into scene.
+
+        Returns ET.Element (robot root), or None if failed.
+        """
+        if not self.menagerie_loader:
+            return None
+
+        robot_type = robot_config.robot_type
+        robot_id = robot_config.robot_id
+
+        mapping = self._robot_model_mapping.get(robot_type)
+        if not mapping:
+            return None
+
+        model_dir, robot_file = mapping
+
+        try:
+            # Get the robot file path (e.g., panda.xml)
+            robot_file_path = self.menagerie_loader._ensure_file_path(model_dir, robot_file)
+            if not robot_file_path:
+                raise FileNotFoundError(f"Could not find {robot_file} for {model_dir}")
+
+            # Read and resolve includes in the robot file
+            robot_xml_content = robot_file_path.read_text()
+            robot_xml = self.menagerie_loader.resolve_includes(robot_xml_content, model_dir)
+
+            # Parse robot XML
+            robot_root = ET.fromstring(robot_xml)
+
+            # Update compiler to use absolute paths for meshes/textures
+            compiler = robot_root.find("compiler")
+            if compiler is not None:
+                assets_dir = robot_file_path.parent / "assets"
+                compiler.set("meshdir", str(assets_dir))
+                compiler.set("texturedir", str(assets_dir))
+                logger.debug(f"Set robot meshdir to: {assets_dir}")
+
+            # Find the worldbody and the first body (robot root)
+            worldbody = robot_root.find(".//worldbody")
+            if worldbody is None:
+                raise ValueError(f"No worldbody in {model_dir}")
+
+            # Find all body elements (skip lights, cameras, etc.)
+            robot_bodies = worldbody.findall("body")
+            if not robot_bodies:
+                raise ValueError(f"No robot body found in {model_dir} worldbody")
+
+            # Update the robot's base body with desired position
+            base_body = robot_bodies[0]
+            base_body.set(
+                "pos", f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}"
+            )
+            base_body.set(
+                "quat",
+                f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
+            )
+
+            logger.info(f"Loaded positioned robot {robot_id} at {pose.position}")
+            return robot_root
+
+        except Exception as e:
+            logger.warning(f"Failed to load robot {robot_type}: {e}")
+            return None
+
+    def _merge_robot_into_scene(self, scene_root: ET.Element, robot_root: ET.Element):
+        """Merge robot XML elements into the main scene.
+
+        Merges: compiler, defaults, assets, worldbody, actuators, tendons, etc.
+        """
+        # Merge compiler settings (robot's meshdir takes precedence)
+        robot_compiler = robot_root.find("compiler")
+        scene_compiler = scene_root.find("compiler")
+        if robot_compiler is not None and scene_compiler is None:
+            scene_root.insert(0, robot_compiler)
+        elif robot_compiler is not None and scene_compiler is not None:
+            # Update scene compiler with robot's mesh paths
+            for attr in ["meshdir", "texturedir"]:
+                if robot_compiler.get(attr):
+                    scene_compiler.set(attr, robot_compiler.get(attr))
+
+        # Merge other sections
+        for child in robot_root:
+            if child.tag == "compiler":
+                continue  # Already handled
+            elif child.tag in [
+                "default",
+                "asset",
+                "actuator",
+                "tendon",
+                "equality",
+                "contact",
+                "keyframe",
+            ]:
+                # Append these sections
+                existing = scene_root.find(child.tag)
+                if existing is None:
+                    scene_root.append(child)
+                else:
+                    # Merge children into existing section
+                    for subchild in child:
+                        existing.append(subchild)
+            elif child.tag == "worldbody":
+                # Worldbody will be merged later
+                pass
+            elif child.tag in ["option", "visual", "statistic"]:
+                # Use robot's settings if not already present
+                if scene_root.find(child.tag) is None:
+                    scene_root.append(child)
+
     def _add_compiler_config(self, root: ET.Element):
         """Add compiler configuration."""
-        compiler = ET.SubElement(root, "compiler")
-        compiler.set("angle", "radian")
-        compiler.set("meshdir", ".")
-        compiler.set("texturedir", ".")
+        existing_compiler = root.find("compiler")
+        if existing_compiler is None:
+            compiler = ET.SubElement(root, "compiler")
+            compiler.set("angle", "radian")
+            # Don't set meshdir/texturedir - robot compiler already set it
+        else:
+            # Compiler already added by robot merge, just ensure angle is set
+            existing_compiler.set("angle", "radian")
 
     def _add_simulation_options(self, root: ET.Element):
         """Add simulation options."""
