@@ -10,7 +10,7 @@ import json
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List
 import numpy as np
 
 # Try to import MuJoCo, fall back to XML parsing only
@@ -38,6 +38,7 @@ class AssetMetadata:
         self.xml_template = kwargs.get("xml_template", "")
         self.joint_configs = kwargs.get("joint_configs", {})
         self.primitive_shape = kwargs.get("primitive_shape")
+        self.composite_shape = kwargs.get("composite_shape")
         self.required_dimensions = kwargs.get("required_dimensions", [])
         self.default_rgba = kwargs.get("default_rgba")
 
@@ -75,7 +76,7 @@ class MetadataExtractor:
     def _load_static_assets(self):
         """Load static asset metadata from JSON database."""
         try:
-            with open(self.assets_db_path, "r") as f:
+            with open(self.assets_db_path) as f:
                 db = json.load(f)
 
             for asset_id, asset_data in db.get("assets", {}).items():
@@ -114,32 +115,55 @@ class MetadataExtractor:
         asset_id: str,
         dimensions: Optional[Dict[str, float]] = None,
     ) -> Optional[AssetMetadata]:
-        """Return metadata customized for provided dimensions (primitives)."""
+        """Return metadata customized for provided dimensions (primitives and composites)."""
 
         metadata = self.get_metadata(asset_id)
         if metadata is None:
             return None
 
-        if not asset_id.startswith("primitive:") or not dimensions:
-            return metadata
+        # Handle primitive types
+        if asset_id.startswith("primitive:") and dimensions:
+            primitive_shape = metadata.primitive_shape or asset_id.split(":", 1)[1]
+            bbox_min, bbox_max = self._compute_primitive_bbox(primitive_shape, dimensions)
+            semantic_points = self._compute_primitive_semantic_points(primitive_shape, dimensions)
 
-        primitive_shape = metadata.primitive_shape or asset_id.split(":", 1)[1]
-        bbox_min, bbox_max = self._compute_primitive_bbox(primitive_shape, dimensions)
-        semantic_points = self._compute_primitive_semantic_points(primitive_shape, dimensions)
+            return AssetMetadata(
+                asset_id=asset_id,
+                asset_type=metadata.asset_type,
+                description=metadata.description,
+                default_dimensions=dimensions,
+                semantic_points=semantic_points,
+                bounding_box={"min": bbox_min.tolist(), "max": bbox_max.tolist()},
+                xml_template=metadata.xml_template,
+                primitive_shape=metadata.primitive_shape,
+                composite_shape=metadata.composite_shape,
+                required_dimensions=metadata.required_dimensions,
+                default_rgba=metadata.default_rgba,
+                joint_configs=metadata.joint_configs,
+            )
 
-        return AssetMetadata(
-            asset_id=asset_id,
-            asset_type=metadata.asset_type,
-            description=metadata.description,
-            default_dimensions=dimensions,
-            semantic_points=semantic_points,
-            bounding_box={"min": bbox_min.tolist(), "max": bbox_max.tolist()},
-            xml_template=metadata.xml_template,
-            primitive_shape=metadata.primitive_shape,
-            required_dimensions=metadata.required_dimensions,
-            default_rgba=metadata.default_rgba,
-            joint_configs=metadata.joint_configs,
-        )
+        # Handle composite types
+        if asset_id.startswith("composite:") and dimensions:
+            composite_shape = metadata.composite_shape or asset_id.split(":", 1)[1]
+            bbox_min, bbox_max = self._compute_composite_bbox(composite_shape, dimensions)
+            semantic_points = self._compute_composite_semantic_points(composite_shape, dimensions)
+
+            return AssetMetadata(
+                asset_id=asset_id,
+                asset_type=metadata.asset_type,
+                description=metadata.description,
+                default_dimensions=dimensions,
+                semantic_points=semantic_points,
+                bounding_box={"min": bbox_min.tolist(), "max": bbox_max.tolist()},
+                xml_template=metadata.xml_template,
+                primitive_shape=metadata.primitive_shape,
+                composite_shape=metadata.composite_shape,
+                required_dimensions=metadata.required_dimensions,
+                default_rgba=metadata.default_rgba,
+                joint_configs=metadata.joint_configs,
+            )
+
+        return metadata
 
     def extract_from_xml(self, xml_str: str, asset_id: str = "unknown") -> AssetMetadata:
         """
@@ -210,7 +234,7 @@ class MetadataExtractor:
             metadata = AssetMetadata(
                 asset_id=asset_id,
                 asset_type="extracted",
-                description=f"Extracted from XML via MuJoCo",
+                description="Extracted from XML via MuJoCo",
                 default_dimensions=dimensions,
                 semantic_points=semantic_points,
                 bounding_box={"min": bbox_min.tolist(), "max": bbox_max.tolist()},
@@ -291,7 +315,7 @@ class MetadataExtractor:
             metadata = AssetMetadata(
                 asset_id=asset_id,
                 asset_type="extracted",
-                description=f"Extracted from XML via parsing",
+                description="Extracted from XML via parsing",
                 default_dimensions=dimensions,
                 semantic_points=semantic_points,
                 bounding_box={"min": bbox_min.tolist(), "max": bbox_max.tolist()},
@@ -429,6 +453,88 @@ class MetadataExtractor:
             "top_surface": [0.0, 0.0, 0.0],
         }
 
+    def _compute_composite_bbox(
+        self,
+        composite_shape: str,
+        dimensions: Dict[str, float],
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Compute axis-aligned bounds for composite geometry (bins, totes, shelves)."""
+
+        shape = composite_shape.lower()
+
+        if shape in ["bin", "tote"]:
+            w = dimensions.get("width", 0.4)
+            d = dimensions.get("depth", 0.4)
+            h = dimensions.get("height", 0.3)
+            # Bounding box includes walls, floor sits at z=0
+            return np.array([-w / 2, -d / 2, 0.0]), np.array([w / 2, d / 2, h])
+
+        if shape == "shelf":
+            w = dimensions.get("width", 0.6)
+            d = dimensions.get("depth", 0.3)
+            h = dimensions.get("height", 0.9)
+            # Shelf has back and side walls, front open
+            return np.array([-w / 2, -d / 2, 0.0]), np.array([w / 2, d / 2, h])
+
+        # Fallback
+        return np.array([-0.2, -0.2, 0.0]), np.array([0.2, 0.2, 0.3])
+
+    def _compute_composite_semantic_points(
+        self,
+        composite_shape: str,
+        dimensions: Dict[str, float],
+    ) -> Dict[str, List[float]]:
+        """Compute semantic points for composite geometry."""
+
+        shape = composite_shape.lower()
+
+        if shape in ["bin", "tote"]:
+            w = dimensions.get("width", 0.4)
+            d = dimensions.get("depth", 0.4)
+            h = dimensions.get("height", 0.3)
+            t = dimensions.get("wall_thickness", 0.01)
+
+            return {
+                "inside_bottom": [0.0, 0.0, t],  # Interior floor
+                "inside_center": [0.0, 0.0, h / 2],  # Center of interior volume
+                "top_rim": [0.0, 0.0, h],  # Top edge
+                "bottom_surface": [0.0, 0.0, 0.0],  # Exterior bottom
+                "center": [0.0, 0.0, h / 2],  # Overall center
+            }
+
+        if shape == "shelf":
+            w = dimensions.get("width", 0.6)
+            d = dimensions.get("depth", 0.3)
+            h = dimensions.get("height", 0.9)
+            t = dimensions.get("wall_thickness", 0.01)
+            num_shelves = int(dimensions.get("num_shelves", 2))
+
+            semantic_points = {
+                "bottom_surface": [0.0, 0.0, 0.0],
+                "center": [0.0, 0.0, h / 2],
+                "front_center": [0.0, -d / 2, h / 2],  # Front opening center
+                "shelf_0": [0.0, 0.0, t],  # Bottom shelf surface
+            }
+
+            # Add interior shelf positions
+            if num_shelves > 0:
+                shelf_spacing = (h - 2 * t) / (num_shelves + 1)
+                for i in range(1, num_shelves + 1):
+                    shelf_z = t + i * shelf_spacing
+                    semantic_points[f"shelf_{i}"] = [0.0, 0.0, shelf_z]
+
+            # Top shelf
+            semantic_points["shelf_top"] = [0.0, 0.0, h - t]
+
+            return semantic_points
+
+        # Fallback
+        return {
+            "center": [0.0, 0.0, 0.15],
+            "bottom_surface": [0.0, 0.0, 0.0],
+            "top_surface": [0.0, 0.0, 0.3],
+        }
+
     def ensure_metadata(self, asset_id: str, xml_path: Optional[str] = None) -> AssetMetadata:
         """
         Ensure metadata exists for an asset, extracting if necessary.
@@ -447,7 +553,7 @@ class MetadataExtractor:
         # Try to extract from XML file if path provided
         if xml_path and Path(xml_path).exists():
             try:
-                with open(xml_path, "r") as f:
+                with open(xml_path) as f:
                     xml_str = f.read()
                 return self.extract_from_xml(xml_str, asset_id)
             except Exception as e:

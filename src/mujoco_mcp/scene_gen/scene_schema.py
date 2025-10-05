@@ -82,43 +82,101 @@ class ObjectPlacement(BaseModel):
 
     @model_validator(mode="after")
     def validate_primitive_dimensions(self):
-        """Ensure primitive objects receive the required dimension keys."""
+        """Ensure primitive and composite objects receive the required dimension keys."""
         object_type = self.object_type or ""
-        if not object_type.startswith("primitive:"):
-            return self
 
-        primitive_type = object_type.split(":", 1)[1]
+        # Check if it's a primitive type
+        if object_type.startswith("primitive:"):
+            primitive_type = object_type.split(":", 1)[1]
 
-        if not self.dimensions:
-            raise ValueError(f"Primitive type {object_type} requires dimensions")
+            if not self.dimensions:
+                raise ValueError(f"Primitive type {object_type} requires dimensions")
 
-        required_keys = {
-            "box": {"width", "depth", "height"},
-            "sphere": {"radius"},
-            "cylinder": {"radius", "height"},
-            "capsule": {"radius", "length"},
-            "ellipsoid": {"radius_x", "radius_y", "radius_z"},
-        }
+            required_keys = {
+                "box": {"width", "depth", "height"},
+                "sphere": {"radius"},
+                "cylinder": {"radius", "height"},
+                "capsule": {"radius", "length"},
+                "ellipsoid": {"radius_x", "radius_y", "radius_z"},
+            }
 
-        if primitive_type in required_keys:
-            missing = required_keys[primitive_type] - set(self.dimensions.keys())
-            if missing:
-                raise ValueError(
-                    f"Primitive {primitive_type} missing dimensions: {sorted(missing)}"
-                )
+            if primitive_type in required_keys:
+                missing = required_keys[primitive_type] - set(self.dimensions.keys())
+                if missing:
+                    raise ValueError(
+                        f"Primitive {primitive_type} missing dimensions: {sorted(missing)}"
+                    )
 
-        # Sanity check on primitive dimensions to catch unreasonable values early
-        for key, value in self.dimensions.items():
-            if value <= 0:
-                raise ValueError(f"Dimension '{key}' for {object_type} must be positive")
-            if value < 1e-3:
-                raise ValueError(
-                    f"Dimension '{key}' for {object_type} is too small ({value}); minimum is 1e-3"
-                )
-            if value > 100:
-                raise ValueError(
-                    f"Dimension '{key}' for {object_type} is too large ({value}); maximum is 100"
-                )
+            # Sanity check on primitive dimensions
+            for key, value in self.dimensions.items():
+                if value <= 0:
+                    raise ValueError(f"Dimension '{key}' for {object_type} must be positive")
+                if value < 1e-3:
+                    raise ValueError(
+                        f"Dimension '{key}' for {object_type} is too small ({value}); minimum is 1e-3"
+                    )
+                if value > 100:
+                    raise ValueError(
+                        f"Dimension '{key}' for {object_type} is too large ({value}); maximum is 100"
+                    )
+
+        # Check if it's a composite type (containers)
+        elif object_type.startswith("composite:"):
+            composite_type = object_type.split(":", 1)[1]
+
+            if not self.dimensions:
+                raise ValueError(f"Composite type {object_type} requires dimensions")
+
+            required_keys = {
+                "bin": {"width", "depth", "height"},
+                "tote": {"width", "depth", "height"},
+                "shelf": {"width", "depth", "height"},
+            }
+
+            if composite_type in required_keys:
+                missing = required_keys[composite_type] - set(self.dimensions.keys())
+                if missing:
+                    raise ValueError(
+                        f"Composite {composite_type} missing dimensions: {sorted(missing)}"
+                    )
+
+            # Sanity check on composite dimensions
+            for key, value in self.dimensions.items():
+                if key in ["wall_thickness", "shelf_spacing"]:
+                    # Optional parameters have more lenient requirements
+                    if not isinstance(value, (int, float)):
+                        raise ValueError(f"Dimension '{key}' for {object_type} must be numeric")
+                    if value <= 0:
+                        raise ValueError(f"Dimension '{key}' for {object_type} must be positive")
+                    if value < 5e-4:
+                        raise ValueError(
+                            f"Dimension '{key}' for {object_type} is too small ({value}); minimum is 5e-4"
+                        )
+                elif key in ["num_shelves"]:
+                    # Integer parameters - accept both int and float that can be converted
+                    if isinstance(value, float) and not value.is_integer():
+                        raise ValueError(
+                            f"Dimension '{key}' for {object_type} must be an integer value"
+                        )
+                    int_value = int(value)
+                    if int_value < 0:
+                        raise ValueError(
+                            f"Dimension '{key}' for {object_type} must be non-negative"
+                        )
+                else:
+                    # Required dimensions
+                    if not isinstance(value, (int, float)):
+                        raise ValueError(f"Dimension '{key}' for {object_type} must be numeric")
+                    if value <= 0:
+                        raise ValueError(f"Dimension '{key}' for {object_type} must be positive")
+                    if value < 1e-3:
+                        raise ValueError(
+                            f"Dimension '{key}' for {object_type} is too small ({value}); minimum is 1e-3"
+                        )
+                    if value > 100:
+                        raise ValueError(
+                            f"Dimension '{key}' for {object_type} is too large ({value}); maximum is 100"
+                        )
 
         return self
 

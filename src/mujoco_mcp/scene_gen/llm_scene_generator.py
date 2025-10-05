@@ -15,6 +15,7 @@ from typing import Dict, Any, Optional, List
 
 from .scene_schema import SceneDescription
 from .symbolic_plan import SymbolicPlanGenerator, PlanToSceneConverter
+from .asset_discovery import AssetCatalog
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.llm_generator")
 
@@ -73,6 +74,15 @@ class LLMSceneGenerator:
             logger.info("Symbolic plan interface initialized for NL→Plan→Scene pipeline")
         else:
             raise ValueError("MetadataExtractor is required for enhanced scene generation")
+
+        # Initialize asset catalog for dynamic asset discovery (scales to unlimited objects/robots)
+        self.asset_catalog = AssetCatalog()
+        logger.info(
+            f"Asset catalog initialized: {len(self.asset_catalog.robots)} robots, "
+            f"{len(self.asset_catalog.primitives)} primitives, "
+            f"{len(self.asset_catalog.composites)} composites, "
+            f"{len(self.asset_catalog.predefined_objects)} objects"
+        )
 
     def _setup_provider_config(self):
         """Setup configuration for the selected LLM provider."""
@@ -670,14 +680,37 @@ Return only the JSON scene description without any additional text or formatting
         """Get the main canned example as a dictionary."""
         return self._get_table_cup_robot_scene().model_dump()
 
-    def _get_system_prompt(self) -> str:
+    def _get_system_prompt(self, user_prompt: str = "") -> str:
         """
-        Get the system prompt for LLM scene generation.
+        Get the system prompt for LLM scene generation with dynamic asset discovery.
 
-        This prompt provides detailed instructions and schema information
-        to help the LLM generate valid scene descriptions.
+        This prompt provides detailed instructions and schema information.
+        Uses semantic search to include only relevant assets based on user prompt.
+
+        Args:
+            user_prompt: User's natural language request (used for asset filtering)
         """
-        return """You are an expert at generating structured scene descriptions for robotic simulations in MuJoCo.
+        # Search for relevant assets based on user prompt
+        if user_prompt:
+            relevant_assets = self.asset_catalog.search_assets(user_prompt, max_results=15)
+            logger.debug(
+                f"Found {len(relevant_assets['robots'])} relevant robots, "
+                f"{len(relevant_assets['composites'])} composites for query"
+            )
+        else:
+            # Fallback: include all assets (backward compatibility)
+            relevant_assets = {
+                "primitives": list(self.asset_catalog.primitives.keys()),
+                "composites": list(self.asset_catalog.composites.keys()),
+                "objects": list(self.asset_catalog.predefined_objects.keys()),
+                "robots": list(self.asset_catalog.robots.keys()),
+            }
+
+        # Generate dynamic asset section
+        assets_section = self.asset_catalog.format_assets_for_prompt(relevant_assets, compact=True)
+
+        # Build prompt with string concatenation to avoid f-string syntax issues
+        base_prompt = """You are an expert at generating structured scene descriptions for robotic simulations in MuJoCo.
 
 Your task is to convert natural language descriptions into valid JSON scene descriptions that follow the exact schema below.
 
@@ -708,25 +741,7 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 }
 ```
 
-## Available Primitive Types (use for custom-sized geometry):
-- **primitive:box** - requires `width`, `depth`, `height` (meters)
-- **primitive:sphere** - requires `radius` (meters)
-- **primitive:cylinder** - requires `radius`, `height` (meters)
-- **primitive:capsule** - requires `radius`, `length` (meters, length excludes hemispherical caps)
-- **primitive:ellipsoid** - requires `radius_x`, `radius_y`, `radius_z` (meters)
-
-## Available Predefined Assets:
-**Objects:**
-- table_standard: Standard work table (0.8m x 1.2m x 0.75m)
-- cup_ceramic_small: Small ceramic cup (0.08m diameter, 0.1m height)
-- box_small: Small cardboard box (0.1m x 0.1m x 0.1m)
-- shelf_small: Small storage shelf with multiple levels
-
-**Robots:**
-- **franka_panda**: Franka Emika Panda 7-DOF robotic arm with parallel-jaw gripper
-  - Also known as: "Franka Panda", "Panda robot", "Franka Emika"
-  - Use for manipulation tasks, pick-and-place, assembly
-  - Automatically loaded from mujoco_menagerie
+""" + assets_section + """
 
 ## Available Constraint Types:
 - **on_top_of**: Places subject on top of reference object
@@ -952,10 +967,14 @@ Output:
 **NOTE**: When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
 
 **REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
+        
+        return base_prompt
 
     def build_llm_prompt(self, user_prompt: str) -> Dict[str, str]:
         """Return a structured prompt bundle for LLM scene generation."""
-        system_prompt = self._get_system_prompt()
+        system_prompt = self._get_system_prompt(
+            user_prompt
+        )  # Pass user_prompt for dynamic asset filtering
 
         context_prompt = self._build_user_message(user_prompt)
 

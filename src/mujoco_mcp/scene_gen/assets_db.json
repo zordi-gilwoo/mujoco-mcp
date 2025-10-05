@@ -103,6 +103,90 @@
       },
       "xml_template": "<body name=\"{name}\" pos=\"{pos}\" quat=\"{quat}\"><geom name=\"{name}_geom\" type=\"ellipsoid\" size=\"{size}\" mass=\"{mass}\" rgba=\"{rgba}\"/></body>"
     },
+    "composite:bin": {
+      "type": "composite",
+      "composite_shape": "bin",
+      "description": "Open-top container with 4 walls and bottom",
+      "required_dimensions": ["width", "depth", "height"],
+      "optional_dimensions": {
+        "wall_thickness": 0.01
+      },
+      "default_dimensions": {
+        "width": 0.4,
+        "depth": 0.4,
+        "height": 0.3,
+        "wall_thickness": 0.01
+      },
+      "semantic_points": {
+        "inside_bottom": [0, 0, 0.01],
+        "inside_center": [0, 0, 0.15],
+        "top_rim": [0, 0, 0.3],
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.15]
+      },
+      "bounding_box": {
+        "min": [-0.2, -0.2, 0],
+        "max": [0.2, 0.2, 0.3]
+      },
+      "xml_template": "<!-- Composite bin - generated dynamically -->"
+    },
+    "composite:tote": {
+      "type": "composite",
+      "composite_shape": "tote",
+      "description": "Open-top tote container with 4 walls and bottom",
+      "required_dimensions": ["width", "depth", "height"],
+      "optional_dimensions": {
+        "wall_thickness": 0.01
+      },
+      "default_dimensions": {
+        "width": 0.5,
+        "depth": 0.5,
+        "height": 0.3,
+        "wall_thickness": 0.01
+      },
+      "semantic_points": {
+        "inside_bottom": [0, 0, 0.01],
+        "inside_center": [0, 0, 0.15],
+        "top_rim": [0, 0, 0.3],
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.15]
+      },
+      "bounding_box": {
+        "min": [-0.25, -0.25, 0],
+        "max": [0.25, 0.25, 0.3]
+      },
+      "xml_template": "<!-- Composite tote - generated dynamically -->"
+    },
+    "composite:shelf": {
+      "type": "composite",
+      "composite_shape": "shelf",
+      "description": "Front-open shelf with back and side walls",
+      "required_dimensions": ["width", "depth", "height"],
+      "optional_dimensions": {
+        "wall_thickness": 0.01,
+        "num_shelves": 2
+      },
+      "default_dimensions": {
+        "width": 0.6,
+        "depth": 0.3,
+        "height": 0.9,
+        "wall_thickness": 0.01,
+        "num_shelves": 2
+      },
+      "semantic_points": {
+        "bottom_surface": [0, 0, 0],
+        "center": [0, 0, 0.45],
+        "front_center": [0, -0.15, 0.45],
+        "shelf_0": [0, 0, 0.01],
+        "shelf_1": [0, 0, 0.45],
+        "shelf_2": [0, 0, 0.89]
+      },
+      "bounding_box": {
+        "min": [-0.3, -0.15, 0],
+        "max": [0.3, 0.15, 0.9]
+      },
+      "xml_template": "<!-- Composite shelf - generated dynamically -->"
+    },
     "table_standard": {
       "type": "table",
       "description": "Standard rectangular table",

@@ -715,8 +715,36 @@ class ConstraintSolver:
         entity_orientation: np.ndarray,
     ) -> np.ndarray:
         """Apply inside constraint (entity placed inside reference container)."""
-        # Place entity at center of reference container
-        position = reference_pose.position.copy()
+        # Try to use semantic points from container (bins, totes, shelves)
+        inside_bottom_point = reference_metadata.get_semantic_point("inside_bottom")
+
+        if inside_bottom_point is not None:
+            # Use interior bottom point for proper placement
+            position = reference_pose.position + np.array(inside_bottom_point)
+
+            # Add half the entity height to place it on the interior floor
+            entity_dims = entity_metadata.get_dimensions()
+            entity_height = entity_dims.get("height", 0.1)
+            if "radius" in entity_dims and "height" not in entity_dims:
+                # Sphere
+                entity_height = entity_dims.get("radius", 0.05) * 2
+            position[2] += entity_height / 2
+        else:
+            # Fallback: place at center of reference container
+            position = reference_pose.position.copy()
+
+            # Try to get container height to estimate interior position
+            ref_dims = reference_metadata.get_dimensions()
+            container_height = ref_dims.get("height", 0.3)
+            wall_thickness = ref_dims.get("wall_thickness", 0.01)
+
+            # Position at bottom interior + half entity height
+            entity_dims = entity_metadata.get_dimensions()
+            entity_height = entity_dims.get("height", 0.1)
+            if "radius" in entity_dims and "height" not in entity_dims:
+                entity_height = entity_dims.get("radius", 0.05) * 2
+
+            position[2] = reference_pose.position[2] + wall_thickness + entity_height / 2
 
         # Apply optional offset
         if constraint.offset:

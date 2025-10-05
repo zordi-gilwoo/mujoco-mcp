@@ -16,6 +16,7 @@ from typing import Dict, Optional, Tuple
 from .scene_schema import SceneDescription
 from .constraint_solver import Pose
 from .metadata_extractor import MetadataExtractor, AssetMetadata
+from .asset_discovery import AssetCatalog
 
 logger = logging.getLogger("mujoco_mcp.scene_gen.xml_builder")
 
@@ -41,10 +42,13 @@ class SceneXMLBuilder:
             "capsule": 780.0,
             "ellipsoid": 600.0,
         }
-        # Robot model name mapping (scene_gen name -> menagerie model/file)
-        self._robot_model_mapping = {
-            "franka_panda": ("franka_emika_panda", "panda.xml"),  # (model_dir, robot_file)
-        }
+
+        # Dynamic robot model mapping from AssetCatalog (auto-discovers all menagerie robots)
+        asset_catalog = AssetCatalog()
+        self._robot_model_mapping = asset_catalog.get_robot_mapping()
+        logger.info(f"Loaded {len(self._robot_model_mapping)} robot models from asset catalog")
+        logger.debug(f"Available robots: {list(self._robot_model_mapping.keys())}")
+
         # Temporary directory for modified robot files
         self._temp_dir = Path(tempfile.mkdtemp(prefix="mujoco_scene_"))
         logger.debug(f"Created temp directory for robot files: {self._temp_dir}")
@@ -349,10 +353,17 @@ class SceneXMLBuilder:
         dimensions: Optional[Dict[str, float]] = None,
         color: Optional[Tuple[float, float, float, float]] = None,
     ):
-        """Add an object to the worldbody, supporting parametric primitives."""
+        """Add an object to the worldbody, supporting parametric primitives and composites."""
         metadata = self.metadata_extractor.get_metadata_with_dimensions(object_type, dimensions)
         if metadata is None:
             metadata = self.metadata_extractor.get_metadata(object_type)
+
+        # Handle composite types (bins, totes, shelves)
+        if object_type.startswith("composite:"):
+            self._add_composite_object(
+                worldbody, object_id, object_type, pose, dimensions, color, metadata
+            )
+            return
 
         if metadata and metadata.xml_template:
             # Use template from metadata
@@ -413,6 +424,166 @@ class SceneXMLBuilder:
                 dimensions=dimensions,
                 color=color,
             )
+
+    def _add_composite_object(
+        self,
+        worldbody: ET.Element,
+        object_id: str,
+        object_type: str,
+        pose: Pose,
+        dimensions: Optional[Dict[str, float]],
+        color: Optional[Tuple[float, float, float, float]],
+        metadata: Optional[AssetMetadata],
+    ):
+        """Generate and add composite objects (bins, totes, shelves) dynamically."""
+        composite_shape = object_type.split(":", 1)[1]
+        dims = dimensions or (metadata.get_dimensions() if metadata else {})
+
+        # Get default color
+        rgba_values = color if color is not None else (0.6, 0.6, 0.6, 1.0)
+
+        # Create body element
+        body = ET.SubElement(worldbody, "body")
+        body.set("name", object_id)
+        body.set("pos", f"{pose.position[0]:.6f} {pose.position[1]:.6f} {pose.position[2]:.6f}")
+        body.set(
+            "quat",
+            f"{pose.orientation[0]:.6f} {pose.orientation[1]:.6f} {pose.orientation[2]:.6f} {pose.orientation[3]:.6f}",
+        )
+
+        # Generate geoms based on composite type
+        if composite_shape in ["bin", "tote"]:
+            self._generate_bin_geoms(body, object_id, dims, rgba_values)
+        elif composite_shape == "shelf":
+            self._generate_shelf_geoms(body, object_id, dims, rgba_values)
+        else:
+            logger.warning(f"Unknown composite shape: {composite_shape}")
+
+        logger.debug(f"Added composite {composite_shape} {object_id}")
+
+    def _generate_bin_geoms(
+        self,
+        body: ET.Element,
+        object_id: str,
+        dimensions: Dict[str, float],
+        rgba: Tuple[float, float, float, float],
+    ):
+        """Generate geoms for bin/tote (4 walls + bottom, top open)."""
+        w = dimensions.get("width", 0.4)
+        d = dimensions.get("depth", 0.4)
+        h = dimensions.get("height", 0.3)
+        t = dimensions.get("wall_thickness", 0.01)
+
+        rgba_str = self._format_rgba(rgba)
+
+        # Bottom plate (sits on ground)
+        bottom = ET.SubElement(body, "geom")
+        bottom.set("name", f"{object_id}_bottom")
+        bottom.set("type", "box")
+        bottom.set("size", f"{w / 2:.6f} {d / 2:.6f} {t / 2:.6f}")
+        bottom.set("pos", f"0 0 {t / 2:.6f}")
+        bottom.set("rgba", rgba_str)
+
+        # Front wall (at -Y)
+        front_wall = ET.SubElement(body, "geom")
+        front_wall.set("name", f"{object_id}_front_wall")
+        front_wall.set("type", "box")
+        front_wall.set("size", f"{w / 2:.6f} {t / 2:.6f} {h / 2:.6f}")
+        front_wall.set("pos", f"0 {-d / 2 + t / 2:.6f} {h / 2:.6f}")
+        front_wall.set("rgba", rgba_str)
+
+        # Back wall (at +Y)
+        back_wall = ET.SubElement(body, "geom")
+        back_wall.set("name", f"{object_id}_back_wall")
+        back_wall.set("type", "box")
+        back_wall.set("size", f"{w / 2:.6f} {t / 2:.6f} {h / 2:.6f}")
+        back_wall.set("pos", f"0 {d / 2 - t / 2:.6f} {h / 2:.6f}")
+        back_wall.set("rgba", rgba_str)
+
+        # Left wall (at -X)
+        left_wall = ET.SubElement(body, "geom")
+        left_wall.set("name", f"{object_id}_left_wall")
+        left_wall.set("type", "box")
+        left_wall.set("size", f"{t / 2:.6f} {(d - 2 * t) / 2:.6f} {h / 2:.6f}")
+        left_wall.set("pos", f"{-w / 2 + t / 2:.6f} 0 {h / 2:.6f}")
+        left_wall.set("rgba", rgba_str)
+
+        # Right wall (at +X)
+        right_wall = ET.SubElement(body, "geom")
+        right_wall.set("name", f"{object_id}_right_wall")
+        right_wall.set("type", "box")
+        right_wall.set("size", f"{t / 2:.6f} {(d - 2 * t) / 2:.6f} {h / 2:.6f}")
+        right_wall.set("pos", f"{w / 2 - t / 2:.6f} 0 {h / 2:.6f}")
+        right_wall.set("rgba", rgba_str)
+
+    def _generate_shelf_geoms(
+        self,
+        body: ET.Element,
+        object_id: str,
+        dimensions: Dict[str, float],
+        rgba: Tuple[float, float, float, float],
+    ):
+        """Generate geoms for shelf (back and side walls, front open, with shelves)."""
+        w = dimensions.get("width", 0.6)
+        d = dimensions.get("depth", 0.3)
+        h = dimensions.get("height", 0.9)
+        t = dimensions.get("wall_thickness", 0.01)
+        num_shelves = int(dimensions.get("num_shelves", 2))
+
+        rgba_str = self._format_rgba(rgba)
+
+        # Back wall (at +Y, full height)
+        back_wall = ET.SubElement(body, "geom")
+        back_wall.set("name", f"{object_id}_back_wall")
+        back_wall.set("type", "box")
+        back_wall.set("size", f"{w / 2:.6f} {t / 2:.6f} {h / 2:.6f}")
+        back_wall.set("pos", f"0 {d / 2 - t / 2:.6f} {h / 2:.6f}")
+        back_wall.set("rgba", rgba_str)
+
+        # Left wall (at -X, full height)
+        left_wall = ET.SubElement(body, "geom")
+        left_wall.set("name", f"{object_id}_left_wall")
+        left_wall.set("type", "box")
+        left_wall.set("size", f"{t / 2:.6f} {d / 2:.6f} {h / 2:.6f}")
+        left_wall.set("pos", f"{-w / 2 + t / 2:.6f} 0 {h / 2:.6f}")
+        left_wall.set("rgba", rgba_str)
+
+        # Right wall (at +X, full height)
+        right_wall = ET.SubElement(body, "geom")
+        right_wall.set("name", f"{object_id}_right_wall")
+        right_wall.set("type", "box")
+        right_wall.set("size", f"{t / 2:.6f} {d / 2:.6f} {h / 2:.6f}")
+        right_wall.set("pos", f"{w / 2 - t / 2:.6f} 0 {h / 2:.6f}")
+        right_wall.set("rgba", rgba_str)
+
+        # Create shelf plates
+        # Bottom shelf (floor)
+        bottom_shelf = ET.SubElement(body, "geom")
+        bottom_shelf.set("name", f"{object_id}_shelf_0")
+        bottom_shelf.set("type", "box")
+        bottom_shelf.set("size", f"{(w - 2 * t) / 2:.6f} {(d - t) / 2:.6f} {t / 2:.6f}")
+        bottom_shelf.set("pos", f"0 {-t / 2:.6f} {t / 2:.6f}")
+        bottom_shelf.set("rgba", rgba_str)
+
+        # Interior shelves
+        if num_shelves > 0:
+            shelf_spacing = (h - 2 * t) / (num_shelves + 1)
+            for i in range(1, num_shelves + 1):
+                shelf_z = t + i * shelf_spacing
+                shelf = ET.SubElement(body, "geom")
+                shelf.set("name", f"{object_id}_shelf_{i}")
+                shelf.set("type", "box")
+                shelf.set("size", f"{(w - 2 * t) / 2:.6f} {(d - t) / 2:.6f} {t / 2:.6f}")
+                shelf.set("pos", f"0 {-t / 2:.6f} {shelf_z:.6f}")
+                shelf.set("rgba", rgba_str)
+
+        # Top shelf
+        top_shelf = ET.SubElement(body, "geom")
+        top_shelf.set("name", f"{object_id}_shelf_top")
+        top_shelf.set("type", "box")
+        top_shelf.set("size", f"{(w - 2 * t) / 2:.6f} {(d - t) / 2:.6f} {t / 2:.6f}")
+        top_shelf.set("pos", f"0 {-t / 2:.6f} {h - t / 2:.6f}")
+        top_shelf.set("rgba", rgba_str)
 
     def _add_fallback_object(
         self,
