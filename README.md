@@ -83,6 +83,76 @@ In Claude Desktop:
 "Show me the current state"
 ```
 
+## 🌐 Browser-Based Visualization
+
+MuJoCo MCP provides two browser-based options for real-time simulation visualization:
+
+### Option 1: WebRTC Remote Viewer (Recommended)
+
+Full-featured WebRTC viewer with real-time video streaming, multi-client support, and interactive controls.
+
+**Features:**
+- Real-time 60 FPS video streaming with WebRTC
+- Multi-client support with session isolation
+- Interactive mouse/keyboard camera controls
+- Natural language scene creation (OpenAI, Claude, Gemini)
+- GPU acceleration with EGL rendering
+- Hardware H.264 encoding support
+
+**Quick Start:**
+```bash
+# Start the WebRTC viewer server
+./scripts/run_py_viewer.sh
+
+# Or using Python module directly
+python -m py_remote_viewer
+
+# With custom configuration
+VIEWER_PORT=8001 DEBUG_MODE=1 python -m py_remote_viewer
+```
+
+**Access:** Open browser to `http://localhost:8000`
+
+**Key Controls:**
+- Left-click + drag: Rotate camera
+- Right-click + drag: Pan camera
+- Scroll wheel: Zoom
+- Arrow keys: Precise rotation
+- Space bar: Pause/resume
+
+**API Endpoints:**
+- `GET /api/health` - Server health check
+- `GET /api/config` - Configuration details
+- `GET /api/stats` - Performance metrics and client statistics
+- `POST /api/scene/load` - Load MuJoCo XML scenes
+- `WS /ws/signaling` - WebRTC signaling and events
+
+See [WebRTC Viewer Guide](docs/WEBRTC_VIEWER.md) for complete documentation.
+
+### Option 2: Simple Web Interface
+
+Lightweight REST API interface for command execution and scene management.
+
+**Quick Start:**
+```bash
+# Start the simple web server
+python web_server.py
+```
+
+**Access:** Open browser to `http://localhost:8080`
+
+**Features:**
+- Simple HTML/CSS/JS interface
+- REST API for MCP command execution
+- Scene loading and management
+- API key configuration for LLM integration
+
+**API Endpoints:**
+- `POST /api/execute-command` - Execute MCP commands
+- `POST /api/scene/load` - Load scenes from XML
+- `GET /api/config` - Get server configuration
+- `POST /api/config/api-key` - Configure LLM API keys
+
 ## 📝 Example Usage
 
 ### Basic Physics Simulations

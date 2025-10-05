@@ -401,7 +401,37 @@ class RemoteViewer {
         // Handle incoming stream
         this.peerConnection.ontrack = (event) => {
             console.log('[RemoteViewer] Received remote stream');
-            this.elements.remoteVideo.srcObject = event.streams[0];
+            const stream = event.streams[0];
+            this.elements.remoteVideo.srcObject = stream;
+            
+            // Add frame tracking to verify frames are being received
+            const videoTrack = stream.getVideoTracks()[0];
+            if (videoTrack) {
+                console.log('[RemoteViewer] Video track active:', videoTrack.enabled, videoTrack.readyState);
+                
+                // Monitor video element events
+                this.elements.remoteVideo.onloadedmetadata = () => {
+                    console.log('[RemoteViewer] Video metadata loaded, dimensions:', 
+                        this.elements.remoteVideo.videoWidth, 'x', this.elements.remoteVideo.videoHeight);
+                    this.elements.remoteVideo.play()
+                        .then(() => console.log('[RemoteViewer] Video playing successfully'))
+                        .catch(e => console.error('[RemoteViewer] Video play failed:', e));
+                };
+                
+                // Track actual frame updates
+                this.elements.remoteVideo.onplaying = () => {
+                    console.log('[RemoteViewer] Video element is playing');
+                };
+                
+                this.elements.remoteVideo.ontimeupdate = () => {
+                    // Increment frame counter when video time updates (indicates new frames)
+                    this.frameCount++;
+                    if (this.frameCount % 30 == 0) {
+                        console.log('[RemoteViewer] Received frame', this.frameCount);
+                    }
+                };
+            }
+            
             this.isConnected = true;
             this.isConnecting = false;
             this.clearReconnectTimer();
@@ -475,6 +505,13 @@ class RemoteViewer {
                     if (message.candidate) {
                         await this.peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
                     }
+                    break;
+                
+                case 'scene_updated':
+                    console.log('[RemoteViewer] Scene updated on server, new model loaded');
+                    // The video track will automatically render the new scene
+                    // No action needed here - just log for visibility
+                    this.logEvent('Scene', 'Scene updated - new model loaded');
                     break;
                     
                 default:
@@ -797,10 +834,15 @@ class RemoteViewer {
      * Start periodic stats updates
      */
     startStatsUpdates() {
+        let lastFrameCount = 0;
         setInterval(() => {
             if (this.isConnected) {
-                // Update frame counter (this would be updated by video track events in a real implementation)
-                // this.frameCount++;
+                // Calculate actual frame rate
+                const framesDelta = this.frameCount - lastFrameCount;
+                if (framesDelta > 0) {
+                    console.log(`[RemoteViewer] Frame rate: ${framesDelta} FPS (total: ${this.frameCount})`);
+                }
+                lastFrameCount = this.frameCount;
                 this.updateUI();
             }
         }, 1000);
@@ -1621,13 +1663,8 @@ if __name__ == "__main__":
                     this.showCommandResult('success', result.result || result.message);
                     this.logEvent('Command', 'Command executed successfully');
                     
-                    // Check if scene was updated and refresh if connected
-                    if (this.isConnected && (result.actions_taken?.includes('created_scene') || 
-                        result.actions_taken?.includes('created_menagerie_scene'))) {
-                        this.sendEvent({
-                            type: 'refresh_scene'
-                        });
-                    }
+                    // Scene is automatically loaded on the server side, no need to send refresh event
+                    // The video track will automatically render the updated simulation
                 } else {
                     throw new Error(result.error || result.message || 'Command execution failed');
                 }
@@ -1677,12 +1714,8 @@ if __name__ == "__main__":
             const result = await response.json();
             
             if (response.ok && result.success) {
-                // Refresh the scene in WebRTC viewer if connected
-                if (this.isConnected) {
-                    this.sendEvent({
-                        type: 'refresh_scene'
-                    });
-                }
+                // Scene is automatically loaded on the server side
+                // The video track will automatically render the updated simulation
                 return true;
             } else {
                 throw new Error(result.error || 'Failed to load scene');
