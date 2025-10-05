@@ -119,7 +119,9 @@ class SignalingServer:
                 None, self.llm_generator.generate_scene_description, prompt
             )
 
-            logger.info(f"LLM generator returned: {type(scene_description)}, has to_xml: {hasattr(scene_description, 'to_xml') if scene_description else False}")
+            logger.info(
+                f"LLM generator returned: {type(scene_description)}, has to_xml: {hasattr(scene_description, 'to_xml') if scene_description else False}"
+            )
 
             if scene_description and hasattr(scene_description, "to_xml"):
                 scene_xml = scene_description.to_xml()
@@ -136,7 +138,9 @@ class SignalingServer:
                 }
             else:
                 # Fallback to basic scene generation
-                logger.warning(f"LLM returned invalid scene_description (type={type(scene_description)}), using fallback")
+                logger.warning(
+                    f"LLM returned invalid scene_description (type={type(scene_description)}), using fallback"
+                )
                 scene_xml = self._generate_basic_scene_from_prompt(prompt)
                 return {
                     "success": True,
