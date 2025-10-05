@@ -769,6 +769,13 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 6. Use `no_collision` constraints to prevent overlaps when necessary
 7. **IMPORTANT**: When user mentions robot names (Franka Panda, Panda, etc.), create a robot entry with `robot_type: "franka_panda"`, NOT a primitive object
 8. Return only valid JSON without markdown formatting
+9. **NUMERICAL PARAMETERS**: Extract ALL numbers from user's request (e.g., "5 shelves" → `num_shelves: 5`, "2m tall" → `height: 2.0`)
+10. **SPATIAL DIRECTIONS**: 
+    - "to the left" / "left of" → use `beside` with NEGATIVE clearance or offset
+    - "to the right" / "right of" → use `beside` with positive clearance
+    - "in front of" → use `in_front_of` (positive clearance = +X direction)
+    - "behind" / "back of" → use `in_front_of` with negative clearance
+    - "opposite side" → use same constraint type but with large clearance to go around object
 
 ## Example 1 - Cart Pole with Custom Dimensions:
 Input: "Create a cart pole with a 2m long pole"
@@ -966,6 +973,67 @@ Output:
   ]
 }
 ```
+
+## Example 5 - Complex Spatial Layout with Numerical Parameters:
+Input: "Put a shelf 0.8m wide, with 5 shelves, 2m tall, to the left of table. Place robot on opposite side."
+Output:
+```json
+{
+  "objects": [
+    {
+      "object_id": "table",
+      "object_type": "table_standard",
+      "constraints": []
+    },
+    {
+      "object_id": "tall_shelf",
+      "object_type": "composite:shelf",
+      "dimensions": {
+        "width": 0.8,
+        "depth": 0.3,
+        "height": 2.0,
+        "num_shelves": 5
+      },
+      "constraints": [
+        {
+          "type": "beside",
+          "subject": "tall_shelf",
+          "reference": "table",
+          "clearance": 0.3,
+          "offset": [-1.1, 0, 0]
+        }
+      ]
+    }
+  ],
+  "robots": [
+    {
+      "robot_id": "robot_arm",
+      "robot_type": "franka_panda",
+      "constraints": [
+        {
+          "type": "beside",
+          "subject": "robot_arm",
+          "reference": "table",
+          "clearance": 0.3,
+          "offset": [1.1, 0, 0]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**CRITICAL NUMBER EXTRACTION**: 
+- "5 shelves" → `num_shelves: 5` (integer in dimensions)
+- "2m tall" → `height: 2.0` (meters in dimensions)
+- "0.8m wide" → `width: 0.8` (meters in dimensions)
+- ALWAYS extract and use numbers from user's request!
+
+**CRITICAL SPATIAL PLACEMENT**:
+- "to the left of X" → beside X with negative X offset (e.g., `offset: [-1.1, 0, 0]`)
+- "to the right of X" → beside X with positive X offset (e.g., `offset: [1.1, 0, 0]`)
+- "opposite side of X" → beside X with large positive offset to go around
+- Use offset field to control exact X position relative to reference
 
 **NOTE**: When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
 
