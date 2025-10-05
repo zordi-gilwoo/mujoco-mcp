@@ -109,11 +109,8 @@ class RemoteViewer {
             loadSceneBtn: document.getElementById('load-scene-btn'),
             
             
-            // Event log and stats
+            // Event log
             eventLog: document.getElementById('event-log'),
-            statConnected: document.getElementById('stat-connected'),
-            statFrames: document.getElementById('stat-frames'),
-            statEvents: document.getElementById('stat-events'),
             
             // API Key Configuration
             aiProviderSelect: document.getElementById('ai-provider-select'),
@@ -825,11 +822,6 @@ class RemoteViewer {
         // Counters
         this.elements.frameCounter.textContent = `Frames: ${this.frameCount}`;
         this.elements.eventCounter.textContent = `Events: ${this.eventCount}`;
-        
-        // Stats
-        this.elements.statConnected.textContent = this.isConnected ? 'Yes' : 'No';
-        this.elements.statFrames.textContent = this.frameCount.toString();
-        this.elements.statEvents.textContent = this.eventCount.toString();
     }
     
     /**
