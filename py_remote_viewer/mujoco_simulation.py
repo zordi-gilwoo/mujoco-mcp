@@ -208,17 +208,60 @@ class MuJoCoSimulation:
             print("[MuJoCoSimulation] Simulation resumed")
 
     def _kick_from_rest(self):
-        """Apply a small perturbation so the model moves when playback starts."""
+        """Apply a small perturbation so the model moves when playback starts.
+
+        Intelligently kicks different joint types:
+        - Hinge joints: 10° rotation
+        - Slide joints: 0.1m displacement
+        - Prefers kicking joints that will create visible motion
+        """
         if self.data is None or self.model is None or self.model.nq <= 0:
             return
 
-        if np.allclose(self.data.qpos, self.model.qpos0) and np.allclose(self.data.qvel, 0):
+        if np.allclose(self.data.qpos, self.model.qpos0) and np.allclose(
+            self.data.qvel, 0
+        ):
             perturb = np.zeros(self.model.nq)
-            perturb[0] = np.deg2rad(10.0)
-            self.data.qpos[:] = self.model.qpos0 + perturb
-            self.data.qvel[:] = 0
-            mujoco.mj_forward(self.model, self.data)
-            self._log_state(prefix="kick")
+
+            # Collect joints to potentially kick
+            joints_to_kick = []
+
+            for i in range(min(self.model.njnt, 5)):  # Check first 5 joints
+                joint_type = self.model.jnt_type[i]
+                joint_qposadr = self.model.jnt_qposadr[i]
+
+                # mjtJoint enum: 0=free, 1=ball, 2=slide, 3=hinge
+                if joint_type == 3:  # Hinge joint
+                    joints_to_kick.append((joint_qposadr, "hinge", np.deg2rad(10.0)))
+                elif joint_type == 2:  # Slide joint
+                    joints_to_kick.append((joint_qposadr, "slide", 0.1))
+                elif joint_type == 1:  # Ball joint
+                    # Ball joints use quaternions (4 values), skip for now
+                    pass
+
+            # Apply perturbations
+            if joints_to_kick:
+                # For cart-pole: prefer kicking the pole (usually second joint)
+                # For others: kick first suitable joint
+                if len(joints_to_kick) >= 2 and joints_to_kick[0][1] == "slide":
+                    # If first is slider, kick second joint (likely the pole/pendulum)
+                    addr, jtype, value = joints_to_kick[1]
+                    perturb[addr] = value
+                    print(
+                        f"[MuJoCoSimulation] Kicking joint at qpos[{addr}] ({jtype}) by {value:.4f}"
+                    )
+                else:
+                    # Kick first joint
+                    addr, jtype, value = joints_to_kick[0]
+                    perturb[addr] = value
+                    print(
+                        f"[MuJoCoSimulation] Kicking joint at qpos[{addr}] ({jtype}) by {value:.4f}"
+                    )
+
+                self.data.qpos[:] = self.model.qpos0 + perturb
+                self.data.qvel[:] = 0
+                mujoco.mj_forward(self.model, self.data)
+                self._log_state(prefix="kick")
 
     def start(self):
         """Backward compatible entry point for play()."""
