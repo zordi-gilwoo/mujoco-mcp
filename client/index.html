@@ -102,10 +102,11 @@
                             <button id="toggle-xml-editor" class="toggle-btn">Show XML Editor</button>
                         </div>
                         <div id="xml-editor-container" class="editor-container collapsed">
-                            <textarea id="xml-editor" class="code-editor" placeholder="Generated Scene XML will appear here...&#10;You can edit the XML directly and save changes."></textarea>
+                            <textarea id="xml-editor" class="code-editor" placeholder="Generated Scene XML will appear here...&#10;You can edit the XML directly and load changes."></textarea>
                             <div class="editor-actions">
-                                <button id="save-xml-btn" class="save-btn" disabled>Save XML</button>
-                                <button id="validate-xml-btn" class="validate-btn">Validate</button>
+                                <button id="load-xml-btn" class="save-btn" disabled>Load XML</button>
+                                <button id="export-xml-btn" class="validate-btn" disabled>Export</button>
+                                <button id="menagerie-btn" class="validate-btn" style="background: #4CAF50;" title="View MuJoCo Menagerie models on GitHub">📦 Menagerie</button>
                                 <div id="xml-validation-status" class="validation-status"></div>
                             </div>
                         </div>

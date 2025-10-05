@@ -33,6 +33,9 @@ class MuJoCoSimulation:
         self._initialized = False
         self._initialization_error = None
 
+        # Store current scene XML for client retrieval
+        self.current_xml = None
+
         # Thread safety for model loading
         self._model_lock = asyncio.Lock()
 
@@ -73,9 +76,15 @@ class MuJoCoSimulation:
             if isinstance(model_xml, str) and os.path.exists(model_xml):
                 model_source_desc = f"path={model_xml}"
                 mj_model = mujoco.MjModel.from_xml_path(model_xml)
+                # Read the XML from file for storage
+                from pathlib import Path
+
+                self.current_xml = Path(model_xml).read_text()
             else:
                 model_source_desc = f"xml[{len(model_xml)} chars]"
                 mj_model = mujoco.MjModel.from_xml_string(model_xml)
+                # Store the XML string
+                self.current_xml = model_xml
 
             self.model = mj_model
             self.data = mujoco.MjData(self.model)
@@ -109,6 +118,11 @@ class MuJoCoSimulation:
 
         except Exception as e:
             print(f"[MuJoCoSimulation] Failed to load model: {e}")
+            import traceback
+
+            traceback.print_exc()
+            # Store the error for potential retrieval
+            self._initialization_error = str(e)
             return False
 
     def _initialize_renderer(self):

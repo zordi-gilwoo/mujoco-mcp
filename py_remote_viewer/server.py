@@ -1,6 +1,5 @@
 """FastAPI server for the remote viewer with WebRTC signaling."""
 
-import asyncio
 import logging
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -20,20 +19,20 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Lifespan context manager for FastAPI app."""
     # Startup
-    logger.info(f"Starting MuJoCo Remote Viewer server")
+    logger.info("Starting MuJoCo Remote Viewer server")
     logger.info(f"Configuration: {app.state.config.to_dict()}")
-    
+
     # Start simulation if configured to auto-start
     app.state.signaling_server.simulation.start()
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down MuJoCo Remote Viewer server")
-    
+
     # Stop simulation
     app.state.signaling_server.simulation.stop()
-    
+
     # Cleanup peer connections
     for client_id in list(app.state.signaling_server.peer_connections.keys()):
         await app.state.signaling_server._cleanup_client(client_id)
@@ -41,19 +40,19 @@ async def lifespan(app: FastAPI):
 
 def create_app(config: ViewerConfig = None) -> FastAPI:
     """Create and configure the FastAPI application.
-    
+
     Args:
         config: Viewer configuration (uses defaults if None)
-        
+
     Returns:
         Configured FastAPI application
     """
     if config is None:
         config = ViewerConfig.from_env()
-    
+
     # Setup logging
     setup_logging(config.log_level)
-    
+
     # Create FastAPI app
     app = FastAPI(
         title="MuJoCo Remote Viewer",
@@ -61,7 +60,7 @@ def create_app(config: ViewerConfig = None) -> FastAPI:
         version="0.1.0",
         lifespan=lifespan,
     )
-    
+
     # Add CORS middleware for development
     app.add_middleware(
         CORSMiddleware,
@@ -70,75 +69,79 @@ def create_app(config: ViewerConfig = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # Create signaling server
     signaling_server = SignalingServer(config)
-    
+
     # Store config and signaling server in app state
     app.state.config = config
     app.state.signaling_server = signaling_server
-    
+
     # Setup routes
     _setup_routes(app, config, signaling_server)
-    
+
     return app
 
 
 def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: SignalingServer):
     """Setup API routes and static file serving.
-    
+
     Args:
         app: FastAPI application
         config: Viewer configuration
         signaling_server: Signaling server instance
     """
-    
+
     # Static files (client assets)
     client_dir = Path(__file__).parent.parent / "client"
     if client_dir.exists():
         app.mount("/static", StaticFiles(directory=client_dir), name="static")
-    
+
     @app.get("/", response_class=HTMLResponse)
     async def serve_client():
         """Serve the main client HTML page."""
         try:
             client_file = client_dir / "index.html"
             if client_file.exists():
-                with open(client_file, 'r') as f:
+                with open(client_file) as f:
                     return HTMLResponse(f.read())
             else:
-                return HTMLResponse("""
+                return HTMLResponse(f"""
                 <html>
                     <head><title>MuJoCo Remote Viewer</title></head>
                     <body>
                         <h1>MuJoCo Remote Viewer</h1>
                         <p>Client files not found. Please check the installation.</p>
-                        <p>Expected client files in: {}</p>
+                        <p>Expected client files in: {client_dir}</p>
                     </body>
                 </html>
-                """.format(client_dir))
+                """)
         except Exception as e:
             logger.error(f"Error serving client: {e}")
-            return HTMLResponse(f"<html><body><h1>Error</h1><p>{e}</p></body></html>", status_code=500)
-    
+            return HTMLResponse(
+                f"<html><body><h1>Error</h1><p>{e}</p></body></html>", status_code=500
+            )
+
     @app.get("/api/config")
     async def get_config():
         """Get viewer configuration."""
         return JSONResponse(config.to_dict())
-    
+
     @app.get("/api/stats")
     async def get_stats():
         """Get server statistics."""
         return JSONResponse(signaling_server.get_stats())
-    
+
     @app.get("/api/health")
     async def health_check():
         """Health check endpoint."""
-        return JSONResponse({
-            "status": "healthy",
-            "version": "0.1.0",
-            "clients_connected": signaling_server.stats["clients_connected"],
-        })
+        return JSONResponse(
+            {
+                "status": "healthy",
+                "version": "0.1.0",
+                "clients_connected": signaling_server.stats["clients_connected"],
+            }
+        )
 
     @app.post("/api/execute-command")
     async def execute_command(request: Request):
@@ -156,66 +159,92 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
         status_code = 200 if result.get("success") else 400
         return JSONResponse(result, status_code=status_code)
 
+    @app.get("/api/scene/current")
+    async def get_current_scene():
+        """Get the current scene XML."""
+        try:
+            # Get XML from the simulation
+            xml = signaling_server.simulation.current_xml
+
+            if xml is None:
+                return JSONResponse({"success": False, "error": "No scene loaded"}, status_code=404)
+
+            return JSONResponse({"success": True, "xml": xml})
+
+        except Exception as e:
+            logger.error(f"Error getting current scene: {e}")
+            return JSONResponse({"error": str(e)}, status_code=500)
+
     @app.post("/api/scene/load")
     async def load_scene(request: Request):
         """Load a scene from XML."""
         try:
             data = await request.json()
-            xml = data.get('xml')
-            
+            xml = data.get("xml")
+
             if not xml:
                 return JSONResponse({"error": "XML content is required"}, status_code=400)
-            
+
             # Basic XML validation
             try:
                 from xml.dom import minidom
+
                 minidom.parseString(xml)
             except Exception as e:
-                return JSONResponse({"error": f"Invalid XML: {str(e)}"}, status_code=400)
-            
-            # Store the scene XML in the signaling server (could be used by simulation)
-            signaling_server.current_scene_xml = xml
-            
-            # Broadcast scene update to all connected clients
-            await signaling_server.broadcast_scene_update(xml)
-            
-            return JSONResponse({
-                "success": True,
-                "message": "Scene loaded successfully"
-            })
-            
+                logger.warning(f"XML validation failed: {e}")
+                return JSONResponse({"error": f"Invalid XML syntax: {str(e)}"}, status_code=400)
+
+            # Load the scene into the simulation
+            try:
+                success = signaling_server.simulation.load_model(xml)
+
+                if not success:
+                    # Try to get detailed error from simulation
+                    error_detail = getattr(
+                        signaling_server.simulation, "_initialization_error", None
+                    )
+                    if error_detail:
+                        error_msg = f"MuJoCo error: {error_detail}"
+                    else:
+                        error_msg = "Failed to load scene into MuJoCo simulation. Check XML structure and MuJoCo compatibility."
+                    logger.error(error_msg)
+                    return JSONResponse({"error": error_msg}, status_code=500)
+
+                logger.info("Scene loaded successfully into simulation")
+                return JSONResponse({"success": True, "message": "Scene loaded successfully"})
+
+            except Exception as load_error:
+                # Capture any unexpected errors
+                error_msg = f"Unexpected error loading scene: {str(load_error)}"
+                logger.error(f"Scene load failed: {error_msg}", exc_info=True)
+                return JSONResponse({"error": error_msg}, status_code=500)
+
         except Exception as e:
-            logger.error(f"Error loading scene: {e}")
-            return JSONResponse({"error": str(e)}, status_code=500)
+            logger.error(f"Unexpected error loading scene: {e}", exc_info=True)
+            return JSONResponse({"error": f"Server error: {str(e)}"}, status_code=500)
 
     @app.post("/api/config/api-key")
     async def save_api_key(request: Request):
         """Save API key configuration for LLM providers."""
         try:
             data = await request.json()
-            provider = data.get('provider')
-            api_key = data.get('api_key')
-            
+            provider = data.get("provider")
+            api_key = data.get("api_key")
+
             if not provider or not api_key:
                 return JSONResponse({"error": "Provider and API key are required"}, status_code=400)
-            
+
             # Store API key configuration in signaling server
-            if not hasattr(signaling_server, 'llm_config'):
+            if not hasattr(signaling_server, "llm_config"):
                 signaling_server.llm_config = {}
-            
-            signaling_server.llm_config[provider] = {
-                'api_key': api_key,
-                'provider': provider
-            }
-            
+
+            signaling_server.llm_config[provider] = {"api_key": api_key, "provider": provider}
+
             # Initialize or update LLM integration
             await signaling_server.setup_llm_integration(provider, api_key)
-            
-            return JSONResponse({
-                "success": True,
-                "message": f"API key configured for {provider}"
-            })
-            
+
+            return JSONResponse({"success": True, "message": f"API key configured for {provider}"})
+
         except Exception as e:
             logger.error(f"Error saving API key: {e}")
             return JSONResponse({"error": str(e)}, status_code=500)
@@ -225,23 +254,23 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
         """Generate scene from natural language prompt using LLM."""
         try:
             data = await request.json()
-            prompt = data.get('prompt')
-            
+            prompt = data.get("prompt")
+
             if not prompt:
                 return JSONResponse({"error": "Prompt is required"}, status_code=400)
-            
+
             # Generate scene using LLM integration
             result = await signaling_server.generate_scene_from_prompt(prompt)
-            
-            if result.get('success'):
+
+            if result.get("success"):
                 return JSONResponse(result)
             else:
                 return JSONResponse(result, status_code=400)
-            
+
         except Exception as e:
             logger.error(f"Error generating scene: {e}")
             return JSONResponse({"error": str(e)}, status_code=500)
-    
+
     @app.websocket("/ws/signaling")
     async def websocket_signaling(websocket: WebSocket):
         """WebSocket endpoint for WebRTC signaling."""
@@ -250,27 +279,27 @@ def _setup_routes(app: FastAPI, config: ViewerConfig, signaling_server: Signalin
 
 def run_server(host: str = None, port: int = None, config: ViewerConfig = None):
     """Run the viewer server with uvicorn.
-    
+
     Args:
         host: Server host (overrides config)
         port: Server port (overrides config)
         config: Viewer configuration
     """
     import uvicorn
-    
+
     if config is None:
         config = ViewerConfig.from_env()
-    
+
     # Override config with parameters
     if host is not None:
         config.host = host
     if port is not None:
         config.port = port
-    
+
     app = create_app(config)
-    
+
     logger.info(f"Starting server on {config.host}:{config.port}")
-    
+
     uvicorn.run(
         app,
         host=config.host,

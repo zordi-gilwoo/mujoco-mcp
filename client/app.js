@@ -90,8 +90,9 @@ class RemoteViewer {
             xmlEditorContainer: document.getElementById('xml-editor-container'),
             xmlEditor: document.getElementById('xml-editor'),
             xmlValidationStatus: document.getElementById('xml-validation-status'),
-            saveXmlBtn: document.getElementById('save-xml-btn'),
-            validateXmlBtn: document.getElementById('validate-xml-btn'),
+            loadXmlBtn: document.getElementById('load-xml-btn'),
+            exportXmlBtn: document.getElementById('export-xml-btn'),
+            menagerieBtn: document.getElementById('menagerie-btn'),
             
             // RL Editor
             toggleRlBtn: document.getElementById('toggle-rl-editor'),
@@ -147,8 +148,9 @@ class RemoteViewer {
         // Editor controls
         this.elements.toggleXmlBtn.addEventListener('click', () => this.toggleXmlEditor());
         this.elements.toggleRlBtn.addEventListener('click', () => this.toggleRlEditor());
-        this.elements.saveXmlBtn.addEventListener('click', () => this.saveXmlContent());
-        this.elements.validateXmlBtn.addEventListener('click', () => this.validateXmlContent());
+        this.elements.loadXmlBtn.addEventListener('click', () => this.loadXmlContent());
+        this.elements.exportXmlBtn.addEventListener('click', () => this.exportXmlContent());
+        this.elements.menagerieBtn.addEventListener('click', () => this.openMenagerieGitHub());
         this.elements.saveRlBtn.addEventListener('click', () => this.saveRlContent());
         this.elements.runRlBtn.addEventListener('click', () => this.runRlScript());
         
@@ -437,6 +439,9 @@ class RemoteViewer {
             this.clearReconnectTimer();
             this.updateUI();
             this.logEvent('WebRTC', 'Video stream connected');
+            
+            // Fetch and display current scene XML
+            this.loadCurrentSceneXML();
         };
         
         // Handle ICE candidates
@@ -1665,6 +1670,9 @@ if __name__ == "__main__":
                     
                     // Scene is automatically loaded on the server side, no need to send refresh event
                     // The video track will automatically render the updated simulation
+                    
+                    // Update XML editor with the newly loaded scene
+                    await this.loadCurrentSceneXML();
                 } else {
                     throw new Error(result.error || result.message || 'Command execution failed');
                 }
@@ -1714,6 +1722,11 @@ if __name__ == "__main__":
             const result = await response.json();
             
             if (response.ok && result.success) {
+                // Update the XML editor with the new scene
+                this.elements.xmlEditor.value = xmlData;
+                this.currentSceneXML = xmlData;
+                this.handleXmlEditorChange();
+                
                 // Scene is automatically loaded on the server side
                 // The video track will automatically render the updated simulation
                 return true;
@@ -1746,6 +1759,50 @@ if __name__ == "__main__":
     }
     
     /**
+     * Load current scene XML from server
+     */
+    async loadCurrentSceneXML() {
+        try {
+            const response = await fetch('/api/scene/current');
+            const result = await response.json();
+            
+            if (result.success && result.xml) {
+                this.elements.xmlEditor.value = result.xml;
+                this.currentSceneXML = result.xml;
+                this.handleXmlEditorChange();
+                console.log('[RemoteViewer] Loaded current scene XML');
+            }
+        } catch (error) {
+            console.warn('[RemoteViewer] Failed to load current scene XML:', error);
+        }
+    }
+    
+    /**
+     * Open MuJoCo Menagerie GitHub repository
+     */
+    openMenagerieGitHub() {
+        const menagerieUrl = 'https://github.com/google-deepmind/mujoco_menagerie';
+        window.open(menagerieUrl, '_blank', 'noopener,noreferrer');
+        this.logEvent('Info', `Opened MuJoCo Menagerie: ${menagerieUrl}`);
+    }
+    
+    /**
+     * Toggle XML editor visibility
+     */
+    toggleXmlEditor() {
+        const container = this.elements.xmlEditorContainer;
+        const btn = this.elements.toggleXmlBtn;
+        
+        if (container.classList.contains('collapsed')) {
+            container.classList.remove('collapsed');
+            btn.textContent = 'Hide XML Editor';
+        } else {
+            container.classList.add('collapsed');
+            btn.textContent = 'Show XML Editor';
+        }
+    }
+    
+    /**
      * Toggle RL editor visibility
      */
     toggleRlEditor() {
@@ -1766,7 +1823,8 @@ if __name__ == "__main__":
      */
     handleXmlEditorChange() {
         const hasContent = this.elements.xmlEditor.value.trim().length > 0;
-        this.elements.saveXmlBtn.disabled = !hasContent;
+        this.elements.loadXmlBtn.disabled = !hasContent;
+        this.elements.exportXmlBtn.disabled = !hasContent;
         
         // Clear validation status when content changes
         this.setEditorValidationStatus('xml', '', '');
@@ -1785,38 +1843,104 @@ if __name__ == "__main__":
     }
     
     /**
-     * Save XML content
+     * Load XML content into simulation
      */
-    async saveXmlContent() {
+    async loadXmlContent() {
         const xml = this.elements.xmlEditor.value.trim();
         if (!xml) return;
         
-        this.elements.saveXmlBtn.disabled = true;
-        this.elements.saveXmlBtn.textContent = 'Saving...';
+        this.elements.loadXmlBtn.disabled = true;
+        this.elements.loadXmlBtn.textContent = 'Loading...';
         
         try {
-            // Validate first
+            // Validate first (client-side check)
             const isValid = await this.validateXmlContent();
             if (!isValid) {
-                throw new Error('XML validation failed');
+                throw new Error('XML validation failed - check for syntax errors');
             }
             
-            // Here you could send the XML to the server or save locally
-            this.currentSceneXML = xml;
-            this.setEditorValidationStatus('xml', 'valid', 'XML saved successfully');
-            this.logEvent('XML', 'Scene XML saved successfully');
+            // Load the scene into the simulation
+            this.setEditorValidationStatus('xml', 'checking', 'Loading scene into MuJoCo simulation...');
+            this.logEvent('XML', 'Sending XML to MuJoCo for loading...');
+            
+            const response = await fetch('/api/scene/load', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    xml: xml
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                this.currentSceneXML = xml;
+                this.setEditorValidationStatus('xml', 'valid', '✓ Scene loaded successfully! MuJoCo accepted the XML.');
+                this.logEvent('XML', '✓ Scene loaded into MuJoCo simulation successfully');
+            } else {
+                const errorMsg = result.error || 'Unknown error loading scene';
+                throw new Error(errorMsg);
+            }
             
         } catch (error) {
-            this.setEditorValidationStatus('xml', 'invalid', `Save failed: ${error.message}`);
-            this.logEvent('Error', `XML save failed: ${error.message}`);
+            // Show detailed error message
+            const errorDetails = error.message || 'Unknown error occurred';
+            this.setEditorValidationStatus('xml', 'invalid', `✗ Load failed: ${errorDetails}`);
+            this.logEvent('Error', `✗ MuJoCo load failed: ${errorDetails}`);
+            
+            // Log to console for debugging
+            console.error('[RemoteViewer] XML load error:', error);
         } finally {
-            this.elements.saveXmlBtn.disabled = false;
-            this.elements.saveXmlBtn.textContent = 'Save XML';
+            this.elements.loadXmlBtn.disabled = false;
+            this.elements.loadXmlBtn.textContent = 'Load XML';
         }
     }
     
     /**
-     * Validate XML content
+     * Export XML content as a downloadable file
+     */
+    exportXmlContent() {
+        const xml = this.elements.xmlEditor.value.trim();
+        if (!xml) {
+            this.setEditorValidationStatus('xml', 'invalid', 'No XML content to export');
+            return;
+        }
+        
+        try {
+            // Create a blob with the XML content
+            const blob = new Blob([xml], { type: 'application/xml' });
+            
+            // Create a download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Generate filename with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `scene_${timestamp}.xml`;
+            
+            // Trigger download
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            this.setEditorValidationStatus('xml', 'valid', `✓ Exported as ${a.download}`);
+            this.logEvent('XML', `Scene XML exported as ${a.download}`);
+            
+        } catch (error) {
+            this.setEditorValidationStatus('xml', 'invalid', `Export failed: ${error.message}`);
+            this.logEvent('Error', `XML export failed: ${error.message}`);
+            console.error('[RemoteViewer] XML export error:', error);
+        }
+    }
+    
+    /**
+     * Validate XML content (used internally before loading)
      */
     async validateXmlContent() {
         const xml = this.elements.xmlEditor.value.trim();
@@ -1850,7 +1974,26 @@ if __name__ == "__main__":
                 throw new Error('Missing <worldbody> element');
             }
             
-            this.setEditorValidationStatus('xml', 'valid', 'Valid MuJoCo XML');
+            // Warn about unexpected text content
+            const warnings = [];
+            const checkForTextContent = (element, elementName) => {
+                for (let node of element.childNodes) {
+                    if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+                        warnings.push(`Unexpected text content in <${elementName}>: "${node.textContent.trim().substring(0, 30)}..."`);
+                    }
+                }
+            };
+            
+            checkForTextContent(worldbody, 'worldbody');
+            worldbody.querySelectorAll('body').forEach(body => {
+                checkForTextContent(body, 'body');
+            });
+            
+            if (warnings.length > 0) {
+                console.warn('[RemoteViewer] XML validation warnings:', warnings);
+                // Don't show warnings during load validation - let MuJoCo handle it
+            }
+            
             return true;
             
         } catch (error) {
@@ -1927,7 +2070,7 @@ if __name__ == "__main__":
     /**
      * Set validation status for editors (separate from the legacy method)
      */
-    setEditorValidationStatus(editorType, status, message) {
+    setEditorValidationStatus(editorType, status, message, isHtml = false) {
         let statusElement;
         
         if (editorType === 'xml') {
@@ -1938,7 +2081,13 @@ if __name__ == "__main__":
         
         if (statusElement) {
             statusElement.className = `validation-status ${status}`;
-            statusElement.textContent = message;
+            // Use innerHTML only when explicitly specified (e.g., for Menagerie links)
+            // Otherwise use textContent for safety
+            if (isHtml) {
+                statusElement.innerHTML = message;
+            } else {
+                statusElement.textContent = message;
+            }
         }
     }
 
