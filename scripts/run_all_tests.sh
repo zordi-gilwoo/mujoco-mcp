@@ -4,9 +4,16 @@
 
 set -e  # Exit immediately on error
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+cd "$PROJECT_ROOT"
+
 echo "=========================================="
 echo "MuJoCo-MCP Pre-Release Test Suite"
 echo "=========================================="
+echo "Project root: $PROJECT_ROOT"
 echo ""
 
 # 1. Environment check
@@ -42,8 +49,8 @@ echo ""
 
 # 6. Local installation test
 echo "6. Running local installation test..."
-chmod +x test_local_install.sh
-./test_local_install.sh
+chmod +x "$SCRIPT_DIR/test_local_install.sh"
+"$SCRIPT_DIR/test_local_install.sh"
 echo ""
 
 # 7. MCP compliance test (Skipped: test_mcp_compliance.py not found)

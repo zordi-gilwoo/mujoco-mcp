@@ -1,26 +1,63 @@
-# MuJoCo Remote Viewer Dependencies
-# Core web framework and server
+# MuJoCo MCP Dependencies
+# Generated from conda environment: mujoco-mcp
+
+# Core MCP and MuJoCo
+mcp>=1.16.0
+mujoco>=2.3.0
+numpy>=2.0.0
+
+# Web framework and server
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
-starlette>=0.27.0
+starlette>=0.46.0
+python-multipart>=0.0.20
+sse-starlette>=3.0.0
 
 # WebRTC support
-aiortc>=1.6.0
-av>=10.0.0
+aiortc>=1.13.0
+av>=14.0.0
+aioice>=0.10.0
+pylibsrtp>=0.12.0
 
 # Async utilities
-asyncio-mqtt>=0.14.0
+asyncio-mqtt>=0.16.0
+paho-mqtt>=2.1.0
+httptools>=0.6.0
+uvloop>=0.21.0
+watchfiles>=1.1.0
 
-# Data processing
-numpy>=1.22.0
+# Data validation and settings
 pydantic>=2.0.0
+pydantic-settings>=2.11.0
 
-# For future MuJoCo integration
-mujoco>=2.3.0
+# Reinforcement Learning
+gymnasium>=1.2.0
+farama-notifications>=0.0.4
 
-# Development dependencies (optional)
-# Uncomment if you want these available
+# LLM Integration (optional)
+anthropic>=0.69.0
+httpx-sse>=0.4.0
+
+# Utilities
+click>=8.3.0
+tqdm>=4.67.0
+python-slugify>=8.0.0
+text-unidecode>=1.3
+
+# Networking utilities
+dnspython>=2.8.0
+ifaddr>=0.2.0
+
+# Cryptography (transitive dependencies for aiortc/WebRTC)
+# Required for DTLS, certificate generation, and SRTP encryption
+# Note: These are automatically installed by aiortc but listed explicitly
+# for version control and security updates
+cryptography>=46.0.0
+pyopenssl>=25.3.0
+certifi>=2025.10.0
+
+# Testing (optional - uncomment if needed)
 # pytest>=7.0.0
-# pytest-asyncio>=0.21.0
-# black>=23.0.0
-# ruff>=0.1.0
+# pytest-asyncio>=1.2.0
+# pytest-playwright>=0.7.0
+# playwright>=1.55.0

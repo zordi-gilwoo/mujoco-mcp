@@ -88,7 +88,13 @@ python -m py_remote_viewer.dev_check
 python scripts/quick_internal_test.py
 
 # Browser tests
-python run_browser_tests.py
+python scripts/run_browser_tests.py
+
+# Comprehensive browser tests
+python scripts/run_all_browser_tests.py
+
+# Full test suite
+./scripts/run_all_tests.sh
 ```
 
 ---

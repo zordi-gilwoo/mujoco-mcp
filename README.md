@@ -12,16 +12,114 @@ Control MuJoCo physics simulations through natural language using the Model Cont
 
 ---
 
-## Quick Start
+## Installation
 
-### 1. Install
+### Prerequisites
+- Python 3.10 or higher
+- conda package manager ([Install Miniconda](https://docs.conda.io/en/latest/miniconda.html))
+- Git
+- (Optional) GPU with CUDA for hardware acceleration
+
+### Step 1: Clone the Repository
 ```bash
-pip install mujoco mcp numpy
+git clone https://github.com/zordi-gilwoo/mujoco-mcp.git
+cd mujoco-mcp
+```
+
+### Step 2: Set Up MuJoCo Menagerie
+Clone the robot models library (required for 56+ robot models including Franka Panda, UR5e, Spot, etc.):
+```bash
+git clone https://github.com/google-deepmind/mujoco_menagerie.git ~/mujoco_menagerie
+```
+
+### Step 3: Configure LLM API Key
+Choose one LLM provider for AI-powered scene generation (required). Get your API key from:
+- **OpenAI**: https://platform.openai.com/api-keys
+- **Anthropic (Claude)**: https://console.anthropic.com/
+- **Google (Gemini)**: https://ai.google.dev/
+
+### Step 4: Create Conda Environment
+```bash
+# Create conda environment with dependencies
+conda env create -f environment.yml
+conda activate mujoco-mcp
+
+# Set environment variables in conda environment
+# For OpenAI:
+conda env config vars set MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
+conda env config vars set OPENAI_API_KEY="sk-your-key-here"
+conda env config vars set LLM_PROVIDER="openai"
+
+# OR for Claude:
+conda env config vars set MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
+conda env config vars set CLAUDE_API_KEY="sk-ant-your-key-here"
+conda env config vars set LLM_PROVIDER="claude"
+
+# OR for Gemini:
+conda env config vars set MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
+conda env config vars set GEMINI_API_KEY="your-key-here"
+conda env config vars set LLM_PROVIDER="gemini"
+
+# Reactivate environment to load variables
+conda deactivate
+conda activate mujoco-mcp
+
+# Install the package in development mode
 pip install -e .
 ```
 
-### 2. Configure Claude Desktop
-Add to your Claude Desktop config:
+### Step 5: Verify Installation
+```bash
+# Test core functionality
+python scripts/quick_internal_test.py
+
+# Verify environment variables
+python -c "import os; print('Menagerie:', os.environ.get('MUJOCO_MENAGERIE_PATH')); print('LLM Provider:', os.environ.get('LLM_PROVIDER'))"
+```
+
+---
+
+## Quick Start: Browser Viewer
+
+The easiest way to get started is with the WebRTC browser viewer. It provides real-time visualization, interactive controls, and LLM-powered scene generation—all in your browser.
+
+### 1. Start the Viewer
+```bash
+./scripts/run_py_viewer.sh
+```
+
+### 2. Open Your Browser
+Navigate to:
+```
+http://localhost:8000
+```
+
+### 3. Create Scenes with Natural Language
+In the browser interface:
+- **"Create a cart pole with a 2m long pole"**
+- **"Place a table with three cylinders lined up on top"**
+- **"Load a Franka Panda robot"**
+- **"Create a double pendulum"**
+
+### 4. Control the Simulation
+Use the browser controls to:
+- ▶️ Play/pause simulation
+- 🎥 Rotate camera with mouse drag
+- 🔍 Zoom with scroll wheel
+- ⚙️ Adjust simulation speed
+- 📊 View real-time state data
+
+
+See [WebRTC Viewer Guide](docs/guides/WEBRTC_VIEWER_GUIDE.md) for advanced usage.
+
+---
+
+## Alternative: Claude Desktop Integration
+
+You can also use MuJoCo MCP directly in Claude Desktop for conversational control.
+
+### 1. Configure Claude Desktop
+Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
 ```json
 {
   "mcpServers": {
@@ -34,6 +132,8 @@ Add to your Claude Desktop config:
 }
 ```
 
+### 2. Restart Claude Desktop
+
 ### 3. Use Natural Language
 In Claude Desktop:
 ```
@@ -41,6 +141,8 @@ In Claude Desktop:
 "Set the pendulum angle to 45 degrees"
 "Step the simulation 100 times"
 ```
+
+See [Claude Desktop Guide](docs/guides/CLAUDE_GUIDE.md) for detailed setup.
 
 ---
 
@@ -79,40 +181,13 @@ See [API Reference](API_REFERENCE.md) for complete documentation.
 
 ---
 
-## Browser Visualization
-
-### WebRTC Viewer (Recommended)
-Real-time browser-based visualization with multi-client support.
-
-```bash
-# Start viewer
-./scripts/run_py_viewer.sh
-
-# Or using Python module
-python -m py_remote_viewer
-
-# Open browser
-open http://localhost:8000
-```
-
-**Features:**
-- 60 FPS video streaming
-- Multi-client collaboration
-- Interactive camera controls
-- LLM-powered scene creation
-- GPU acceleration
-
-See [WebRTC Viewer Guide](docs/guides/WEBRTC_VIEWER_GUIDE.md) for details.
-
----
-
 ## Scene Generation
 
 Create MuJoCo scenes from natural language:
 
 ```bash
 # Generate scene from text
-PYTHONPATH=./src python text_llm.py "create a cart pole with a 2m long pole"
+PYTHONPATH=./src python scripts/text_llm.py "create a cart pole with a 2m long pole"
 ```
 
 **Example Prompts:**
@@ -161,16 +236,16 @@ for _ in range(1000):
 
 ---
 
-## Advanced Setup
-
-### MuJoCo Menagerie (Robot Models)
-```bash
-git clone https://github.com/google-deepmind/mujoco_menagerie.git ~/mujoco_menagerie
-export MUJOCO_MENAGERIE_PATH=~/mujoco_menagerie
-```
+## Advanced Topics
 
 ### Process Pool Architecture
-Each client gets an isolated viewer process with automatic port allocation and cleanup. See [Process Pool Architecture](docs/architecture/PROCESS_POOL_ARCHITECTURE.md).
+Each WebRTC client gets an isolated viewer process with automatic port allocation and cleanup. This enables true multi-user collaboration without conflicts. See [Process Pool Architecture](docs/architecture/PROCESS_POOL_ARCHITECTURE.md) for details.
+
+### GPU Acceleration
+Enable hardware-accelerated rendering and H.264 encoding for improved performance. See [EGL & H.264 Features](docs/features/EGL_H264_FEATURES.md) for configuration.
+
+### RL Integration
+Use MuJoCo MCP as a Gymnasium-compatible environment for reinforcement learning. See [Advanced Features Guide](docs/features/ADVANCED_FEATURES_GUIDE.md) for examples.
 
 ---
 

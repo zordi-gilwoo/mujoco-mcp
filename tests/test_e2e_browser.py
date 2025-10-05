@@ -32,7 +32,7 @@ class MCPServerManager:
                 cmd = ["python", "-m", "src.mujoco_mcp.mcp_server_headless"]
             else:
                 # Start the web server (which uses MCP server internally)
-                cmd = ["python", "web_server.py"]
+                cmd = ["python", "scripts/web_server.py"]
 
             self.process = await asyncio.create_subprocess_exec(
                 *cmd,
@@ -109,9 +109,9 @@ class BrowserTestSuite:
 
         # Check if page title is correct
         title = await self.page.title()
-        assert (
-            "MuJoCo Remote Viewer" in title
-        ), f"Expected title with 'MuJoCo Remote Viewer', got: {title}"
+        assert "MuJoCo Remote Viewer" in title, (
+            f"Expected title with 'MuJoCo Remote Viewer', got: {title}"
+        )
 
         # Check for essential UI elements
         header = await self.page.query_selector("h1")
@@ -176,7 +176,7 @@ class BrowserTestSuite:
         commands = ["get server info", "create a pendulum simulation", "show current state"]
 
         for i, cmd in enumerate(commands):
-            print(f"   Executing command {i+1}: {cmd}")
+            print(f"   Executing command {i + 1}: {cmd}")
 
             # Clear and enter command
             command_input = self.page.locator("#freestyle-command-input")
@@ -300,7 +300,7 @@ class BrowserTestSuite:
         print(f"Total Tests: {total}")
         print(f"Passed: {passed} ✅")
         print(f"Failed: {failed} ❌")
-        print(f"Success Rate: {(passed/total*100):.1f}%" if total > 0 else "0.0%")
+        print(f"Success Rate: {(passed / total * 100):.1f}%" if total > 0 else "0.0%")
 
         print("\nDetailed Results:")
         for result in self.test_results["test_details"]:

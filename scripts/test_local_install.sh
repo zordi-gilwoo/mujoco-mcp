@@ -3,6 +3,12 @@
 
 echo "=== MuJoCo-MCP Local Installation Test ==="
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+cd "$PROJECT_ROOT"
+
 # 1. Create test virtual environment
 echo "1. Creating test virtual environment..."
 python -m venv test_env
