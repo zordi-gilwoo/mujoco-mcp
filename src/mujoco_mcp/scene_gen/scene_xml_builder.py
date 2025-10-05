@@ -131,6 +131,9 @@ class SceneXMLBuilder:
                     worldbody, robot.robot_id, robot.robot_type, poses[robot.robot_id]
                 )
 
+        # Add keyframe to ensure robots start at default poses (static)
+        self._add_default_keyframe(mujoco, scene)
+
         # Convert to string with proper formatting
         xml_str = self._prettify_xml(mujoco)
         logger.info(f"Generated XML scene with {len(xml_str)} characters")
@@ -284,17 +287,22 @@ class SceneXMLBuilder:
 
     def _add_defaults(self, root: ET.Element):
         """Add default element properties."""
-        default = ET.SubElement(root, "default")
+        # Only add defaults if they don't already exist (robot might have brought them)
+        existing_default = root.find("default")
+        if existing_default is None:
+            default = ET.SubElement(root, "default")
 
-        # Default joint properties
-        joint_default = ET.SubElement(default, "joint")
-        joint_default.set("damping", "0.1")
+            # Default joint properties - high stiffness/damping to keep robots static
+            joint_default = ET.SubElement(default, "joint")
+            joint_default.set("damping", "1.0")  # Increased from 0.1 to keep joints static
+            joint_default.set("armature", "0.1")  # Add armature for stability
+            joint_default.set("stiffness", "0")  # No spring force (rely on damping)
 
-        # Default geom properties
-        geom_default = ET.SubElement(default, "geom")
-        geom_default.set("contype", "1")
-        geom_default.set("conaffinity", "1")
-        geom_default.set("friction", "1 0.005 0.0001")
+            # Default geom properties
+            geom_default = ET.SubElement(default, "geom")
+            geom_default.set("contype", "1")
+            geom_default.set("conaffinity", "1")
+            geom_default.set("friction", "1 0.005 0.0001")
 
     def _add_assets(self, root: ET.Element):
         """Add asset definitions (textures, materials)."""
@@ -800,6 +808,34 @@ class SceneXMLBuilder:
                     # For revolute joints, we could set initial positions
                     # This is a placeholder - actual implementation depends on joint types
                     joint.set("pos", str(joint_values[i]))
+
+    def _add_default_keyframe(self, root: ET.Element, scene: SceneDescription):
+        """Add a default keyframe to keep robots in their initial poses (static)."""
+        if not scene.robots:
+            return  # No robots, no keyframe needed
+
+        # Check if keyframe section already exists
+        keyframe_section = root.find("keyframe")
+
+        # If keyframe section exists and has keys, robot already has keyframes - don't add duplicate
+        if keyframe_section is not None and len(keyframe_section) > 0:
+            logger.debug(
+                f"Keyframe section already exists with {len(keyframe_section)} keys - skipping"
+            )
+            return
+
+        # Only add keyframe if none exists
+        if keyframe_section is None:
+            keyframe_section = ET.SubElement(root, "keyframe")
+
+            # Add a "scene_init" keyframe that uses robot's default configuration
+            key = ET.SubElement(keyframe_section, "key")
+            key.set("name", "scene_init")
+            key.set("time", "0")
+
+            logger.debug(f"Added scene_init keyframe for {len(scene.robots)} robots")
+        else:
+            logger.debug("Keyframe section exists but is empty - skipping")
 
     def _add_fallback_robot(
         self, worldbody: ET.Element, robot_id: str, robot_type: str, pose: Pose

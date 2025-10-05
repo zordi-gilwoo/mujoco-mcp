@@ -710,7 +710,8 @@ Return only the JSON scene description without any additional text or formatting
         assets_section = self.asset_catalog.format_assets_for_prompt(relevant_assets, compact=True)
 
         # Build prompt with string concatenation to avoid f-string syntax issues
-        base_prompt = """You are an expert at generating structured scene descriptions for robotic simulations in MuJoCo.
+        base_prompt = (
+            """You are an expert at generating structured scene descriptions for robotic simulations in MuJoCo.
 
 Your task is to convert natural language descriptions into valid JSON scene descriptions that follow the exact schema below.
 
@@ -741,7 +742,9 @@ Your task is to convert natural language descriptions into valid JSON scene desc
 }
 ```
 
-""" + assets_section + """
+"""
+            + assets_section
+            + """
 
 ## Available Constraint Types:
 - **on_top_of**: Places subject on top of reference object
@@ -967,7 +970,8 @@ Output:
 **NOTE**: When user mentions "Franka Panda", "Panda robot", or "Franka Emika", use `robot_type: "franka_panda"`.
 
 **REMEMBER**: constraint references must match defined entity IDs exactly. Generate realistic, physically plausible scenes. Respond with valid JSON only."""
-        
+        )
+
         return base_prompt
 
     def build_llm_prompt(self, user_prompt: str) -> Dict[str, str]:
