@@ -29,6 +29,19 @@ export VIEWER_PORT="${VIEWER_PORT:-8000}"
 export LOG_LEVEL="${LOG_LEVEL:-DEBUG}"
 export DEBUG_MODE="${DEBUG_MODE:-1}"
 
+# Auto-detect headless environment and set OpenGL backend
+# Check if DISPLAY is not set or if we're on a headless server
+if [[ -z "$MUJOCO_GL" ]]; then
+    if [[ -z "$DISPLAY" ]] || ! command -v xdpyinfo &> /dev/null || ! xdpyinfo &> /dev/null; then
+        echo "🖥️  Headless environment detected - defaulting to OSMesa rendering"
+        export MUJOCO_GL=osmesa
+        export PYOPENGL_PLATFORM=osmesa
+    fi
+elif [[ "$MUJOCO_GL" == "osmesa" ]]; then
+    export PYOPENGL_PLATFORM=osmesa
+    echo "🖥️  Using OSMesa for headless rendering"
+fi
+
 echo "📋 Configuration:"
 echo "  Host: $VIEWER_HOST"
 echo "  Port: $VIEWER_PORT"
